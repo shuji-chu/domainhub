@@ -2,20 +2,18 @@
 
 认证后端统一运行在 Cloudflare Workers，账户、凭据、会话、邮件令牌和 GitHub OAuth 状态保存在 Cloudflare D1（`domainhub-db`）。前端由 Cloudflare Pages 提供。
 
-## 邮件发送：阿里云 DirectMail
+## 邮件发送：Resend
 
-Worker 使用阿里云 DirectMail `SingleSendMail` API（HMAC-SHA1 签名），无需把邮件密钥放进前端。
+Worker 使用 Resend Email API 发送注册验证码、邮箱验证验证码和密码重置验证码。邮件凭据只保存在 Cloudflare Worker Secrets，不进入前端。
 
-需要在 `domainhub-api` Worker 的 Settings → Variables and Secrets 中设置以下 Secret：
+需要配置：
 
 | 名称 | 用途 |
 |---|---|
-| `ALI_ACCESS_KEY_ID` | 阿里云 RAM AccessKey ID |
-| `ALI_ACCESS_KEY_SECRET` | 阿里云 RAM AccessKey Secret |
-| `ALI_DM_ACCOUNT` | DirectMail 控制台已验证的发件地址 |
-| `ALI_DM_REGION` | 发件地址所在区域，默认 `cn-hangzhou` |
+| `RESEND_API_KEY` | Resend API Key（Secret） |
+| `RESEND_FROM_EMAIL` | 已在 Resend 验证的发件人，例如 `DomainHub <noreply@lynli.me>`（Secret） |
 
-这些变量此前已存在于 Cloudflare Pages 项目 `lynli` 的生产环境。请将其安全迁移到 Worker Secret，不要提交到 Git 或放入 `VITE_` 前端变量。发件地址必须已在同一区域的 DirectMail 控制台验证。
+生产 Worker 已配置上述变量。发件域名必须在 Resend 控制台完成验证，且发件地址需属于已验证域名。
 
 ## GitHub OAuth
 
@@ -42,11 +40,11 @@ Cloudflare Worker Route 已绑定：
 
 ## 认证接口
 
-- `POST /auth/register`：创建待验证账户并发送 30 分钟邮箱验证链接。
-- `POST /auth/email/verification/send`：重新发送验证链接。
+- `POST /auth/register`：创建待验证账户并发送 10 分钟、6 位数字邮箱验证码。
+- `POST /auth/email/verification/send`：重新发送 6 位数字验证码。
 - `GET /auth/email/verify?token=...`：一次性验证邮箱。
 - `POST /auth/login`：仅允许已验证邮箱登录。
-- `POST /auth/password/forgot`：统一响应，发送 20 分钟密码重置链接。
+- `POST /auth/password/forgot`：统一响应，发送 10 分钟、6 位数字密码重置验证码。
 - `POST /auth/password/reset`：一次性重置密码并撤销旧会话。
 - `GET /api/github-oauth/start`：启动 GitHub OAuth。
 - `GET /api/github-oauth/callback`：处理 GitHub OAuth 回调。
