@@ -170,6 +170,9 @@ class SessionGuard implements CanActivate {
   }
 }
 
+// TODO(audit-archive): connect an external KMS/HSM signer and immutable
+// R2 Bucket Locks archive. The application hash chain is not a substitute
+// for independently signed daily manifests or external WORM retention.
 @Injectable()
 class AuditService {
   constructor(private readonly db: PrismaService) {}
