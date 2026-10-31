@@ -2,8 +2,8 @@
 set -euo pipefail
 
 API_BASE="${API_BASE:-https://domainhub-api.chulingli1988.workers.dev}"
-EMAIL="${TEST_EMAIL:-domainhub-smoke-$(date +%s)@example.net}"
-PASSWORD="${TEST_PASSWORD:-ChangeMe-OnlyFor-Smoke-2026!}"
+export EMAIL="${TEST_EMAIL:-domainhub-smoke-$(date +%s)@example.net}"
+export PASSWORD="${TEST_PASSWORD:-ChangeMe-OnlyFor-Smoke-2026!}"
 
 command -v curl >/dev/null || { echo "curl is required" >&2; exit 2; }
 command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 2; }
