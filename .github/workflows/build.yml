@@ -1,5 +1,7 @@
 name: Pull request checks
 on:
+  push:
+    branches: [feat/auth-core]
   pull_request:
     branches: [main]
 
