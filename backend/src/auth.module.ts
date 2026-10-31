@@ -42,7 +42,10 @@ function cookieValue(header: string | undefined, name: string): string | undefin
   }
   return undefined;
 }
-function sameOrigin(candidate: string, allowed: string): boolean {\n  try { return new URL(candidate).origin === new URL(allowed).origin; } catch { return false; }\n}\nfunction safeEqual(a: string, b: string): boolean {
+function sameOrigin(candidate: string, allowed: string): boolean {
+  try { return new URL(candidate).origin === new URL(allowed).origin; } catch { return false; }
+}
+function safeEqual(a: string, b: string): boolean {
   const aa = Buffer.from(a); const bb = Buffer.from(b);
   return aa.length === bb.length && timingSafeEqual(aa, bb);
 }
