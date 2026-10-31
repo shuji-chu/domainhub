@@ -1,6 +1,6 @@
 import {
   BadRequestException, CanActivate, ConflictException, Controller, ExecutionContext,
-  ForbiddenException, Injectable, Module, OnModuleInit, Post, Get, Req, Res,
+  ForbiddenException, Injectable, Module, OnModuleInit, Post, Get, Req, Res, TooManyRequestsException,
   UnauthorizedException, UseGuards, Logger,
 } from "@nestjs/common";
 import { randomBytes, createHash, createHmac, timingSafeEqual } from "node:crypto";
@@ -92,7 +92,7 @@ class RateLimitService {
     });
     if (bucket.count > limit) {
       const retry = Math.max(1, Math.ceil((startMs + windowMs - now.getTime()) / 1000));
-      throw new ForbiddenException({ statusCode: 429, message: "请求过于频繁，请稍后重试", retryAfter: retry });
+      throw new TooManyRequestsException({ message: "请求过于频繁，请稍后重试", retryAfter: retry });
     }
   }
 }
