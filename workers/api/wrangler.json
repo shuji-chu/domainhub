@@ -1,0 +1,15 @@
+{
+  "name": "domainhub-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-31",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "domainhub-db",
+      "database_id": "bce5b9ed-f4d0-4351-83a3-b1e7342741f0"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
