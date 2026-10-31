@@ -54,6 +54,7 @@ model User {
   updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
   lastLoginAt        DateTime?     @map("last_login_at") @db.Timestamptz(6)
   deletedAt          DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  quotaLedger        QuotaLedger[]
   credential         Credential?
   sessions           Session[]
   emailTokens        EmailVerificationToken[]
@@ -306,4 +307,31 @@ model AuditLog {
   @@index([shardId, sequenceNo])
   @@index([sourceShardId])
   @@map("audit_logs")
+}
+
+model QuotaLedger {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  delta          Int
+  sourceType     String   @map("source_type")
+  idempotencyKey String   @unique @map("idempotency_key")
+  relatedUserId  String?  @map("related_user_id") @db.Uuid
+  reason         String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@map("quota_ledger")
+}
+
+model RateLimitBucket {
+  id          String   @id @default(uuid()) @db.Uuid
+  dimension   String
+  subjectHash String   @map("subject_hash")
+  windowStart DateTime @map("window_start") @db.Timestamptz(6)
+  count       Int      @default(0)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+  @@unique([dimension, subjectHash, windowStart])
+  @@index([expiresAt])
+  @@map("rate_limit_buckets")
 }
