@@ -14,3 +14,29 @@ table{min-width:650px}th{padding:10px;background:#fafafa;color:#737373;font-size
 @media(max-width:560px){.pools{grid-template-columns:1fr}.heading{align-items:flex-start;gap:10px}.heading label{white-space:nowrap}.toolbar{align-items:flex-start;flex-direction:column}.toolbar input{width:100%}.quota-row{grid-template-columns:1fr 38px 65px 48px 48px;gap:5px}.quota-row button{padding:6px 3px}}
 
 .login-screen{min-height:100vh;display:grid;place-items:center;padding:20px}.login-card{width:min(390px,100%);padding:28px;background:#fff;border:1px solid var(--line);border-radius:8px;display:grid;gap:13px}.login-card h1{font-size:22px;letter-spacing:-.04em;margin:14px 0 0}.login-card p{font-size:11px;color:#737373}.login-card label{display:grid;gap:6px;font-size:10px;color:#525252}.login-card input{height:36px;border:1px solid #d4d4d4;border-radius:5px;padding:0 10px}.login-card .primary{height:36px}.main header{display:flex;align-items:center;justify-content:space-between}.main header button{border:1px solid var(--line);background:#fff;border-radius:5px;padding:6px 10px;font-size:10px}.toast{position:fixed;right:20px;bottom:20px;background:#171717;color:#fff;padding:11px 14px;z-index:50;font-size:11px;cursor:pointer}
+
+/* Aurora glass admin console */
+:root{color-scheme:dark;--ink:#eaf2ff;--muted:#8ea4c7;--line:rgba(145,180,245,.17);--blue:#70adff}
+html,body,#root{min-height:100%;background:#060b17;color:var(--ink)}
+body{background:radial-gradient(ellipse at 55% -20%,#192d54 0%,#0a1428 48%,#060b17 100%);background-attachment:fixed}
+.sidebar{background:rgba(7,15,30,.84);border-color:var(--line);backdrop-filter:blur(22px)}
+.logo{color:#eff6ff}.logo>b{background:linear-gradient(135deg,#4b8eff,#5bd8ed);box-shadow:0 0 22px rgba(74,151,255,.32)}
+.logo small,.caption{color:#7f9ac1}.nav{color:#91a7ca}.nav:hover,.nav.active{background:rgba(68,119,195,.14);color:#eff6ff}.nav.active{box-shadow:inset 2px 0 #70c8ff}.nav i{color:#7dc8ff}
+.side-foot{background:rgba(17,34,61,.62);border-color:var(--line);color:#9eb9df}
+.main header{background:rgba(7,15,30,.72);border-color:var(--line);backdrop-filter:blur(20px);color:#8fa6ca}.main header b{color:#eaf2ff}.main header button{background:rgba(22,43,76,.7);border-color:var(--line);color:#dceaff}
+.content{max-width:1400px}.heading small{color:#7bbaff;letter-spacing:.16em}.heading h1{color:#f2f7ff;font-size:27px}.heading p{color:#8ea4c7}
+.metrics>div,.card{background:linear-gradient(145deg,rgba(17,32,58,.86),rgba(9,19,37,.86));border:1px solid rgba(145,180,245,.19);border-radius:10px;backdrop-filter:blur(22px);box-shadow:0 16px 55px rgba(0,0,0,.2),inset 0 1px rgba(255,255,255,.035)}
+.metrics>div{color:#91a7c9}.metrics b{color:#edf5ff}.card h2{color:#eef5ff}.card>p,.toolbar p{color:#8ea4c7}
+.toolbar input,.quota-row input,.login-card input{background:rgba(5,14,29,.85);border:1px solid rgba(135,173,239,.25);color:#eaf2ff}.toolbar input:focus,.quota-row input:focus{outline:2px solid rgba(98,167,255,.15);border-color:#69baff}
+th{background:rgba(5,14,29,.7);color:#8ea4c7;border-color:var(--line)}td{color:#a9bddb;border-color:rgba(145,180,245,.1)}td b{color:#edf5ff}
+.action,.quota-row button,.main header button{background:rgba(30,55,91,.55);border-color:rgba(133,174,245,.24);color:#d9eaff}.action:hover,.quota-row button:hover{background:rgba(54,94,151,.4);border-color:#6bbcff;box-shadow:0 0 20px rgba(65,148,255,.16)}
+.primary{background:linear-gradient(100deg,#397cff,#36b9e8);border:1px solid rgba(157,220,255,.45);box-shadow:0 8px 26px rgba(43,131,255,.25);color:white}.primary:hover{box-shadow:0 0 28px rgba(64,160,255,.4)}
+.good{background:rgba(25,164,116,.14);color:#72e5bf}.bad{background:rgba(210,62,93,.13);color:#ff9caf}
+.quota-row{border-color:rgba(145,180,245,.1)}.quota-row span{color:#d9e8ff}.quota-row small{color:#829bc1}.quota-row strong{color:#f0f6ff}
+.main footer{border-color:var(--line);color:#7891b8}
+.login-screen{background:radial-gradient(ellipse at 50% 15%,rgba(46,104,194,.22),transparent 50%)}
+.login-card{background:rgba(12,25,47,.92);border:1px solid rgba(145,180,245,.24);border-radius:12px;box-shadow:0 25px 90px rgba(0,0,0,.4),0 0 50px rgba(42,122,255,.1);backdrop-filter:blur(24px)}
+.login-card h1{color:#eff6ff}.login-card p,.login-card label{color:#91a8cb}
+.login-card .primary{background:linear-gradient(100deg,#397cff,#36b9e8);border:1px solid rgba(157,220,255,.45)}
+.toast{background:rgba(12,27,51,.96);border:1px solid rgba(115,174,255,.3);color:#eaf2ff;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+@media(max-width:800px){.sidebar{background:rgba(7,15,30,.94)}}
