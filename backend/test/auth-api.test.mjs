@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter } from "@nestjs/platform-fastify";
-import { AppModule } from "../dist/app.module";
-import { PrismaService } from "../dist/prisma.service";
+import { AppModule } from "../dist/app.module.js";
+import { PrismaService } from "../dist/prisma.service.js";
 
 process.env.NODE_ENV = "test";
 process.env.PUBLIC_APP_URL = "http://127.0.0.1:5173";
