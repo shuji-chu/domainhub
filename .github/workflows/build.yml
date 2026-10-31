@@ -1,7 +1,7 @@
 name: Build and test
 on:
   push:
-    branches: [main]
+    branches: [main, "feat/auth-core"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -83,5 +83,14 @@ jobs:
       - name: Apply initial migration to ephemeral CI database
         run: npx prisma migrate deploy
 
-      - name: Compile NestJS skeleton
+      - name: Compile NestJS API
         run: npm run build
+
+      - name: Run authentication API integration tests
+        env:
+          NODE_ENV: test
+          PUBLIC_APP_URL: http://127.0.0.1:5173
+          SESSION_HASH_PEPPER: ci-session-pepper-not-for-production
+          CSRF_SECRET: ci-csrf-secret-not-for-production
+          RATE_LIMIT_HMAC_KEY: ci-rate-limit-key-not-for-production
+        run: npm run test:e2e
