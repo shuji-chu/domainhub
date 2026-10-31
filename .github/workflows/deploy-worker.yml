@@ -48,15 +48,17 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
           DNSHE_API_TOKEN: ${{ secrets.DNSHE_API_TOKEN }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+          ALI_ACCESS_KEY_ID: ${{ secrets.ALI_ACCESS_KEY_ID }}
+          ALI_ACCESS_KEY_SECRET: ${{ secrets.ALI_ACCESS_KEY_SECRET }}
+          ALI_DM_ACCOUNT: ${{ secrets.ALI_DM_ACCOUNT }}
+          ALI_DM_REGION: ${{ secrets.ALI_DM_REGION }}
           GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}
           GITHUB_CLIENT_SECRET: ${{ secrets.GITHUB_CLIENT_SECRET }}
           OAUTH_STATE_ENCRYPTION_KEY: ${{ secrets.OAUTH_STATE_ENCRYPTION_KEY }}
         shell: bash
         run: |
           set -euo pipefail
-          for name in DIGITALOCEAN_TOKEN DNSHE_API_TOKEN RESEND_API_KEY RESEND_FROM_EMAIL GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET OAUTH_STATE_ENCRYPTION_KEY; do
+          for name in DIGITALOCEAN_TOKEN DNSHE_API_TOKEN ALI_ACCESS_KEY_ID ALI_ACCESS_KEY_SECRET ALI_DM_ACCOUNT ALI_DM_REGION GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET OAUTH_STATE_ENCRYPTION_KEY; do
             value="${!name:-}"
             if [ -n "$value" ]; then
               if ! printf '%s' "$value" | wrangler secret put "$name"; then
