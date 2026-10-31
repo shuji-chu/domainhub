@@ -49,6 +49,26 @@ jobs:
           node-version: 22
       - name: Validate Worker JavaScript syntax
         run: node --check workers/api/src/index.js
+      - name: Smoke test live GitHub OAuth redirect and PKCE cookie
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          trap 'rm -f "$headers"' EXIT
+          status="$(curl --max-time 20 -sS -D "$headers" -o /dev/null -w '%{http_code}' https://lynli.me/api/github-oauth/start)"
+          test "$status" = "302"
+          python3 - "$headers" <<'PY'
+          import sys
+          from urllib.parse import urlparse, parse_qs
+          raw = open(sys.argv[1], encoding="utf-8").read().lower()
+          location = next((line.split(":", 1)[1].strip() for line in open(sys.argv[1], encoding="utf-8") if line.lower().startswith("location:")), "")
+          assert "__host-domainhub_oauth_bind=" in raw, "OAuth binding cookie missing"
+          parsed = urlparse(location)
+          query = parse_qs(parsed.query)
+          assert parsed.netloc == "github.com" and parsed.path == "/login/oauth/authorize", "OAuth did not redirect to GitHub"
+          assert query.get("redirect_uri") == ["https://lynli.me/api/github-oauth/callback"], "Unexpected GitHub callback URI"
+          assert query.get("code_challenge_method") == ["S256"], "PKCE S256 is missing"
+          print("Live GitHub OAuth start: PASS")
+          PY
       - name: Validate D1 auth migration
         run: |
           grep -q "CREATE TABLE IF NOT EXISTS oauth_login_codes" workers/api/migrations/0003_github_login_codes.sql
