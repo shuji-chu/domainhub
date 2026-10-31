@@ -1,0 +1,309 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  pending_verification
+  active
+  suspended
+  deleted
+  @@map("user_status")
+}
+
+enum OAuthPurpose {
+  login
+  link
+  @@map("oauth_purpose")
+}
+
+enum AuditShardKind {
+  primary
+  compensation
+  @@map("audit_shard_kind")
+}
+
+enum AuditShardState {
+  open
+  closing
+  sealed
+  @@map("audit_shard_state")
+}
+
+enum AuditOutcome {
+  success
+  failure
+  blocked
+  @@map("audit_outcome")
+}
+
+model User {
+  id                 String        @id @default(uuid()) @db.Uuid
+  email              String        @db.Citext
+  emailNormalized    String        @unique @map("email_normalized")
+  emailVerifiedAt    DateTime?     @map("email_verified_at") @db.Timestamptz(6)
+  status             UserStatus    @default(pending_verification)
+  // DEPRECATED: compatibility-only legacy field; never use for authorization. RBAC is authoritative.
+  role               String?       @map("role")
+  displayName        String?       @map("display_name")
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastLoginAt        DateTime?     @map("last_login_at") @db.Timestamptz(6)
+  deletedAt          DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  credential         Credential?
+  sessions           Session[]
+  emailTokens        EmailVerificationToken[]
+  passwordTokens     PasswordResetToken[]
+  oauthAccounts      OAuthAccount[]
+  oauthStates        OAuthState[]
+  userRoles          UserRole[]    @relation("AssignedUserRoles")
+  grantedRoles       UserRole[]    @relation("RoleGrantor")
+  actorAuditLogs     AuditLog[]    @relation("AuditActor")
+  targetAuditLogs    AuditLog[]    @relation("AuditTarget")
+
+  @@index([status, createdAt])
+  @@map("users")
+}
+
+model Credential {
+  id                 String   @id @default(uuid()) @db.Uuid
+  userId             String   @unique @map("user_id") @db.Uuid
+  passwordHash       String   @map("password_hash")
+  passwordChangedAt  DateTime @map("password_changed_at") @db.Timestamptz(6)
+  passwordVersion    Int      @default(1) @map("password_version")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("credentials")
+}
+
+model Session {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  tokenHash         Bytes     @unique @map("token_hash")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt        DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  // Renewal throttle marker; updated only when a renewal is actually accepted.
+  lastRenewedAt     DateTime? @map("last_renewed_at") @db.Timestamptz(6)
+  idleExpiresAt     DateTime  @map("idle_expires_at") @db.Timestamptz(6)
+  absoluteExpiresAt DateTime  @map("absolute_expires_at") @db.Timestamptz(6)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
+  ipPrefix          String?   @map("ip_prefix") @db.Inet
+  userAgentHash     Bytes?    @map("user_agent_hash")
+  passwordVersion   Int       @map("password_version")
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt, idleExpiresAt, absoluteExpiresAt])
+  @@index([userId, lastSeenAt(sort: Desc)])
+  @@map("sessions")
+}
+
+model EmailVerificationToken {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  tokenHash       Bytes     @unique @map("token_hash")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt      DateTime? @map("consumed_at") @db.Timestamptz(6)
+  requestIpPrefix String?   @map("request_ip_prefix") @db.Inet
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId, createdAt])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id                         String    @id @default(uuid()) @db.Uuid
+  userId                     String    @map("user_id") @db.Uuid
+  tokenHash                  Bytes     @unique @map("token_hash")
+  createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt                  DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt                 DateTime? @map("consumed_at") @db.Timestamptz(6)
+  requestIpPrefix            String?   @map("request_ip_prefix") @db.Inet
+  credentialPasswordVersion  Int       @map("credential_password_version")
+  user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId, createdAt])
+  @@map("password_reset_tokens")
+}
+
+model OAuthAccount {
+  id                     String   @id @default(uuid()) @db.Uuid
+  userId                 String   @map("user_id") @db.Uuid
+  provider               String
+  providerUserId         String   @map("provider_user_id")
+  providerLogin          String?  @map("provider_login")
+  providerEmail          String?  @map("provider_email") @db.Citext
+  providerEmailNormalized String? @map("provider_email_normalized")
+  providerEmailVerified  Boolean  @default(false) @map("provider_email_verified")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastUsedAt             DateTime? @map("last_used_at") @db.Timestamptz(6)
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model OAuthState {
+  id                   String       @id @default(uuid()) @db.Uuid
+  stateHash            Bytes        @unique @map("state_hash")
+  cookieBindingHash    Bytes        @map("cookie_binding_hash")
+  purpose              OAuthPurpose
+  userId               String?      @map("user_id") @db.Uuid
+  sessionBindingHash   Bytes?       @map("session_binding_hash")
+  pkceVerifierEncrypted Bytes       @map("pkce_verifier_encrypted")
+  redirectKey          String       @map("redirect_key")
+  createdAt             DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt             DateTime     @map("expires_at") @db.Timestamptz(6)
+  consumedAt            DateTime?    @map("consumed_at") @db.Timestamptz(6)
+  requestIpPrefix       String?      @map("request_ip_prefix") @db.Inet
+  user                  User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId, createdAt])
+  @@map("oauth_states")
+}
+
+model Role {
+  id             String           @id @default(uuid()) @db.Uuid
+  code           String           @unique
+  name           String
+  isSystem       Boolean          @default(false) @map("is_system")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  rolePermissions RolePermission[]
+  userRoles      UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id              String           @id @default(uuid()) @db.Uuid
+  code            String           @unique
+  description     String
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  roleId          String    @map("role_id") @db.Uuid
+  grantedByUserId String?   @map("granted_by_user_id") @db.Uuid
+  grantedAt       DateTime  @default(now()) @map("granted_at") @db.Timestamptz(6)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
+  reason          String?
+  user            User      @relation("AssignedUserRoles", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy       User?     @relation("RoleGrantor", fields: [grantedByUserId], references: [id], onDelete: SetNull)
+  role            Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@index([userId, revokedAt])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model AuditShard {
+  id                   String          @id @default(uuid()) @db.Uuid
+  shardKey             String          @unique @map("shard_key")
+  chainId              String          @unique @map("chain_id") @db.Uuid
+  kind                 AuditShardKind
+  state                AuditShardState @default(open)
+  hourStartedAt        DateTime?       @map("hour_started_at") @db.Timestamptz(6)
+  receivedAt           DateTime?       @map("received_at") @db.Timestamptz(6)
+  sourceShardId        String?         @map("source_shard_id") @db.Uuid
+  sourceManifestHash   Bytes?          @map("source_manifest_hash")
+  previousManifestHash Bytes?          @map("previous_manifest_hash")
+  genesisAnchorHash    Bytes           @map("genesis_anchor_hash")
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  sealedAt             DateTime?       @map("sealed_at") @db.Timestamptz(6)
+  sourceShard          AuditShard?     @relation("CompensationSource", fields: [sourceShardId], references: [id], onDelete: Restrict)
+  compensationShards   AuditShard[]    @relation("CompensationSource")
+  sourceAuditLogs      AuditLog[]      @relation("AuditCompensationSource")
+  logs                 AuditLog[]
+  manifest             AuditManifest?
+
+  @@index([kind, state, createdAt])
+  @@index([sourceShardId])
+  @@map("audit_shards")
+}
+
+model AuditManifest {
+  id                       String     @id @default(uuid()) @db.Uuid
+  shardId                  String     @unique @map("shard_id") @db.Uuid
+  manifestHash             Bytes      @unique @map("manifest_hash")
+  previousManifestHash     Bytes?     @map("previous_manifest_hash")
+  sourceManifestHash       Bytes?     @map("source_manifest_hash")
+  genesisAnchorHash        Bytes      @map("genesis_anchor_hash")
+  firstSequenceNo          BigInt?    @map("first_sequence_no")
+  lastSequenceNo           BigInt?    @map("last_sequence_no")
+  rowCount                 BigInt     @map("row_count")
+  firstEntryHash           Bytes?     @map("first_entry_hash")
+  lastEntryHash            Bytes?     @map("last_entry_hash")
+  signature                Bytes
+  signatureKeyId           String     @map("signature_key_id")
+  signatureAlgorithm       String     @map("signature_algorithm")
+  canonicalizationVersion  String     @map("canonicalization_version")
+  sealedAt                 DateTime   @map("sealed_at") @db.Timestamptz(6)
+  createdAt                DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  shard                    AuditShard @relation(fields: [shardId], references: [id], onDelete: Restrict)
+
+  @@map("audit_manifests")
+}
+
+model AuditLog {
+  id                         String          @id @default(uuid()) @db.Uuid
+  shardId                    String          @map("shard_id") @db.Uuid
+  shardKind                  AuditShardKind  @map("shard_kind")
+  chainId                    String          @map("chain_id") @db.Uuid
+  sequenceNo                 BigInt          @map("sequence_no")
+  occurredAt                 DateTime        @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  sourceOccurredAt           DateTime?       @map("source_occurred_at") @db.Timestamptz(6)
+  sourceShardId              String?         @map("source_shard_id") @db.Uuid
+  sourceManifestHash         Bytes?          @map("source_manifest_hash")
+  prevHash                   Bytes           @map("prev_hash")
+  entryHash                  Bytes           @map("entry_hash")
+  manifestAnchorHash         Bytes           @map("manifest_anchor_hash")
+  compensationManifestPrevHash Bytes?        @map("compensation_manifest_prev_hash")
+  actorUserId                String?         @map("actor_user_id") @db.Uuid
+  targetUserId               String?         @map("target_user_id") @db.Uuid
+  actorRef                   String          @map("actor_ref")
+  actorType                  String          @map("actor_type")
+  action                     String
+  outcome                    AuditOutcome
+  requestId                  String?         @map("request_id")
+  ipPrefix                   String?         @map("ip_prefix") @db.Inet
+  userAgentHash              Bytes?          @map("user_agent_hash")
+  metadata                   Json            @default("{}") @db.JsonB
+  actor                       User?           @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  target                      User?           @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  shard                       AuditShard      @relation(fields: [shardId], references: [id], onDelete: Restrict)
+  sourceShard                 AuditShard?     @relation("AuditCompensationSource", fields: [sourceShardId], references: [id], onDelete: Restrict)
+
+  @@unique([chainId, sequenceNo])
+  @@index([occurredAt])
+  @@index([actorUserId, occurredAt])
+  @@index([action, occurredAt])
+  @@index([shardId, sequenceNo])
+  @@index([sourceShardId])
+  @@map("audit_logs")
+}
