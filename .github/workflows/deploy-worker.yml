@@ -46,12 +46,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: wrangler whoami
-      - name: Apply pending D1 migrations
-        working-directory: workers/api
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: wrangler d1 migrations apply domainhub-db --remote
       - name: Sync Worker secrets
         working-directory: workers/api
         env:
@@ -64,7 +58,7 @@ jobs:
           set -euo pipefail
           printf '%s' "$DIGITALOCEAN_TOKEN" | wrangler secret put DIGITALOCEAN_TOKEN
           printf '%s' "$DNSHE_API_TOKEN" | wrangler secret put DNSHE_API_TOKEN
-      - name: Deploy Worker
+      - name: Deploy Worker to Cloudflare
         working-directory: workers/api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
