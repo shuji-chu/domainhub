@@ -477,3 +477,38 @@ main{display:block;padding-bottom:88px}
 .auth-notice{margin:0;padding:10px 12px;color:#a9e8ce;background:rgba(26,133,93,.13);border:1px solid rgba(86,211,158,.24);border-radius:7px;font-size:11px;line-height:1.7}
 .auth-secondary-form{margin-top:24px}
 @media(max-width:390px){.auth-divider{margin:16px 0 12px}.github-auth{min-height:43px}}
+
+/* DomainHub 登录页：简洁蓝白主题，移除粒子/网格/轨道动画 */
+:root{color-scheme:light;color:#17324f;background:#f4f9ff;--ink:#17324f;--muted:#61758e;--line:#d7e6f5;--blue:#2878e8}
+body{color:#17324f;background:linear-gradient(180deg,#eaf4ff 0%,#f7fbff 46%,#fff 100%);background-attachment:fixed}
+.app-shell:before,.auth-shell:after,.auth-shell .ambient-layer{display:none!important}
+.auth-shell{min-height:100svh;overflow:auto;padding:24px 16px 18px;background:linear-gradient(145deg,#eaf4ff 0%,#f7fbff 52%,#fff 100%)}
+.auth-main{max-width:460px;padding:18px 0}
+.auth-card{max-width:460px;padding:32px 30px 26px;color:#17324f;background:rgba(255,255,255,.96);border:1px solid #d7e6f5;border-radius:20px;box-shadow:0 18px 55px rgba(38,91,150,.12);backdrop-filter:none}
+.auth-card:before{display:none}
+.auth-card-head small{color:#2878d8;letter-spacing:.12em}
+.auth-card-head h2{color:#102b49}
+.auth-card-head p{color:#637991}
+.auth-switch{background:#f2f7fd;border:1px solid #dce8f5}
+.auth-switch button{color:#61758e}
+.auth-switch button.selected{color:#1559ad;background:#e1efff;box-shadow:inset 0 0 0 1px #b7d5f8}
+.auth-form label{color:#344f6b}
+.auth-form input{color:#183653;background:#fff;border:1px solid #d4e1ef;border-radius:10px}
+.auth-form input::placeholder{color:#91a3b7}
+.auth-form input:focus{border-color:#5b9be9;box-shadow:0 0 0 3px rgba(56,132,224,.12)}
+.auth-submit{min-height:50px;border:0;border-radius:10px;background:linear-gradient(100deg,#347df0,#36b6e8);box-shadow:0 8px 22px rgba(47,127,220,.2)}
+.auth-link{color:#2878d8}
+.auth-link:hover{color:#1559ad;text-shadow:none}
+.auth-divider{color:#8295aa}
+.auth-divider:before,.auth-divider:after{background:#dce7f2}
+.github-auth{color:#183653;background:#f7fbff;border:1px solid #d3e1ef;border-radius:10px}
+.github-auth:hover{color:#1559ad;background:#edf6ff;border-color:#9fc4ef;box-shadow:0 5px 18px rgba(56,132,224,.1);transform:none}
+.auth-security{color:#8295aa}
+.auth-security span{color:#3687db}
+.auth-notice{color:#176b4b;background:#eefaf4;border-color:#c9ebd9}
+.form-error{color:#c43d54!important}
+.auth-footer{color:#8093a9}
+.auth-loading p{color:#536e8b}
+.auth-orbit{color:#2d7bd2;border-color:#b9d7f5;box-shadow:0 0 0 10px rgba(70,145,255,.06)}
+@media(max-width:760px){.auth-shell{padding:18px 15px 12px}.auth-main{padding:12px 0}.auth-card{padding:25px 21px 22px}}
+@media(max-width:390px){.auth-card{padding:22px 17px 19px}}
