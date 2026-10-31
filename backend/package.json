@@ -7,7 +7,8 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "prisma:validate": "prisma validate",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "test:e2e": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@nestjs/common": "10.4.15",
@@ -15,11 +16,16 @@
     "@nestjs/platform-fastify": "10.4.15",
     "@prisma/client": "6.19.0",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.1"
+    "rxjs": "7.8.1",
+    "argon2": "^0.41.1",
+    "@nestjs/config": "^3.3.0",
+    "nodemailer": "^6.10.1",
+    "@types/cookie": "^0.6.0"
   },
   "devDependencies": {
     "@types/node": "22.10.2",
     "prisma": "6.19.0",
-    "typescript": "5.7.2"
+    "typescript": "5.7.2",
+    "@types/nodemailer": "^6.4.17"
   }
 }
