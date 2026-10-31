@@ -1,33 +1,47 @@
 # DomainHub
 
-DomainHub 是一个独立的域名领取与 DNS 管理平台前端项目，采用简洁的工具型界面，适配桌面端与手机端。
+DomainHub 是独立的域名查询与 DNS 管理平台。产品方向参考 DNSHE：蓝白配色、信息密度适中、以查询和管理工具为中心，不采用商城式首页。
 
-## 当前阶段
+## 本地启动
 
-- [x] 响应式首页与移动端导航
-- [x] 域名搜索与后缀筛选演示
-- [x] TG 机器人绑定、加入 TG 群组的奖励入口（前端占位）
-- [x] DNS、Cloudflare、云服务器、USDT 充值功能入口
-- [x] GitHub Actions 自动安装依赖、类型检查、构建并上传 dist 产物
-- [ ] 邮箱注册与 GitHub OAuth（需后端与 OAuth App 配置）
-- [ ] Telegram Bot 任务验证及活动管理
-- [ ] 域名库存、领取、续期与回收 API
-- [ ] 权威 DNS 服务与 Cloudflare DNS API
-- [ ] USDT 支付与订单系统
-- [ ] 云服务器商品与订单管理
-
-## 本地开发
+要求 Node.js 20、npm。
 
 ```bash
 npm install
 npm run dev
 ```
 
-## 构建
+生产构建与预览：
 
 ```bash
 npm run build
 npm run preview
 ```
 
-> 注意：当前页面包含演示数据和前端占位交互，不会真实注册域名、写入 DNS、发放奖励或处理资金。正式接入时需配置安全的服务端 API；任何 Bot Token、DNS Token、OAuth Secret 和支付密钥都不得写入前端或提交到仓库。
+## 环境变量
+
+复制 `.env.example` 为 `.env.local`。当前阶段不需要配置任何密钥。环境变量文件已加入忽略规则；不要把 API Token、OAuth Secret、Bot Token、数据库密码或支付密钥放入前端变量或提交到仓库。
+
+## 当前已完成
+
+- 响应式工具型首页与移动端导航
+- 演示域名数据集中在 `src/mock/domains.ts`，每条数据带 `isDemo: true`
+- 本地关键词搜索、后缀下拉筛选和快捷后缀筛选
+- 未开放功能明确禁用或标记，不会触发假操作
+- GitHub Actions 使用 Node.js 20，执行依赖安装、TypeScript 检查、Vite 构建并上传 `dist/`
+
+## 尚未完成
+
+- 账号体系：邮箱注册/登录、GitHub OAuth
+- 风控底座：限流、验证码、配额、审计
+- 真实只读域名列表与搜索 API
+- 领取：幂等、事务、库存预占与回滚（未开始，需另行确认）
+- Telegram 身份验证与活动管理
+- 本站权威 DNS 与 Cloudflare DNS API
+- 支付、USDT、云服务器商品与订单
+
+## 开发顺序
+
+账号体系 → 风控底座 → 只读域名列表/搜索 →（确认后）领取 → TG 验证 → DNS/Cloudflare → 支付。
+
+> 当前域名数据为本地演示内容，不代表真实库存、可用性或注册状态。当前版本不执行注册、领取、DNS 修改、支付或资金操作。管理功能在完成鉴权和授权前不会开放。
