@@ -3,7 +3,7 @@ const API='https://domainhub-api.chulingli1988.workers.dev';const nav=[['users',
 function App(){const[token,setToken]=useState(sessionStorage.getItem('dh_admin_token')||''),[email,E]=useState('boss@lynli.me'),[password,PW]=useState(''),[error,ER]=useState(''),[users,U]=useState([]),[pool,S]=useState([]),[page,PG]=useState('users'),[query,Q]=useState(''),[amount,A]=useState({}),[toast,T]=useState(''),[busy,B]=useState(false);
 const api=async(path,init={})=>{const r=await fetch(API+path,{...init,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,...(init.headers||{})}});const d=await r.json();if(!r.ok)throw new Error(d.error||'请求失败');return d};
 const load=async()=>{const [u,p]=await Promise.all([api('/admin/users'),api('/admin/inventory')]);U(u.users||[]);S(p.domains||[])};
-useEffect(()=>{if(token)load().catch(e=>{ER(e.message);sessionStorage.removeItem('dh_admin_token');setToken('')})},[]);
+useEffect(()=>{if(token)load().catch(e=>{ER(e.message);sessionStorage.removeItem('dh_admin_token');setToken('')})},[token]);
 const login=async(e)=>{e.preventDefault();B(true);ER('');try{const r=await fetch(API+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})}),d=await r.json();if(!r.ok)throw new Error(d.error||'登录失败');sessionStorage.setItem('dh_admin_token',d.token);setToken(d.token);setTimeout(()=>{},0)}catch(e){ER(e.message)}finally{B(false)}};
 const logout=async()=>{try{await api('/auth/logout',{method:'POST'})}catch{}sessionStorage.removeItem('dh_admin_token');setToken('');U([]);S([])};
 const act=async(fn,msg)=>{try{await fn();await load();T(msg)}catch(e){T(e.message)}};
