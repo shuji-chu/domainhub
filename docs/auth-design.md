@@ -296,3 +296,113 @@ Redis 故障时，注册、登录、验证邮件、密码重置等敏感入口 f
 - Rate limit：生产 Redis 故障时敏感入口 fail-closed。
 - OAuth email：已验证邮箱跨本地账号冲突拒绝；未验证邮箱不参与匹配。
 - CSRF：token 获取接口拒绝不可信 Origin、跨站请求和无来源浏览器请求。
+
+
+## 15. P0 最终实施细节（本节覆盖第 13 节相应条款）
+
+本节进一步收敛 RBAC 权限矩阵、审计哈希链写入/校验/归档、审计主体外键和会话管理产品兜底。仍然只是设计文档；不表示已创建 schema、API 或页面。
+
+### 15.1 RBAC 最终权限矩阵与 users.role 处置
+
+**最终授权模型：只以四张 RBAC 关系表为准。** users.role 是历史单角色字段，不作为缓存，不参与授权判断。迁移期先将现有 role 值映射到 user_roles；完成数据核对后，将 users.role 标记为 deprecated 并在后续独立 migration 删除。不得长期双写 users.role 与 user_roles，避免权限分歧。新用户只创建 user 角色关联；所有授权决策从 user_roles → roles → role_permissions → permissions 读取，默认拒绝。角色分配变更必须审计。
+
+固定角色：
+- user：普通用户自身资源权限。
+- admin：受限运营支持权限，不具备授权管理权限。
+- super_admin：最高管理权限，可管理 RBAC 和安全策略；高风险动作必须重新认证、填写原因并审计。
+
+权限点采用 resource.action。以下为本阶段权限注册表；未列出的动作一律无权执行。
+
+| 资源 | 权限点 | admin | super_admin | 边界 |
+|---|---|---:|---:|---|
+| 用户 | admin.user.read | 允许 | 允许 | 仅必要资料，敏感字段脱敏 |
+| 用户 | admin.user.suspend / admin.user.restore | 允许 | 允许 | admin 只能封禁/恢复普通 user；不得封禁 admin/super_admin |
+| 用户 | admin.user.delete | 禁止 | 禁止 | 用户删除走独立隐私流程，不作为后台按钮 |
+| 配额 | admin.quota.read | 允许 | 允许 | 只读查看当前配额与变更记录 |
+| 配额 | admin.quota.adjust | 允许（受限） | 允许 | admin 仅能在已批准的运营上下限内调整普通用户配额，必须填写原因；超出上限、负向/批量异常调整需 super_admin 审批 |
+| 订单 | admin.order.read | 允许 | 允许 | 只读查看订单状态、金额摘要和关联用户；支付凭据/密钥脱敏 |
+| 订单 | admin.order.refund / admin.order.cancel / admin.order.mark_paid | 禁止 | 禁止（本阶段） | 支付/退款业务未设计，不得伪造订单状态或手工标记已支付 |
+| 域名 | admin.domain.read / admin.domain.status.read | 允许 | 允许 | 只读查看域名记录、审核状态和状态变更历史 |
+| 域名 | admin.domain.status.update | 禁止（本阶段） | 禁止（本阶段） | 本阶段不实现域名领取、库存、DNS 或域名状态写操作 |
+| 域名 | admin.domain.claim / admin.dns.write | 禁止 | 禁止 | 明确不在账号体系范围 |
+| 会话 | admin.session.read / admin.session.revoke | 允许 | 允许 | 只可查看必要设备摘要并撤销目标用户 session；不能读取原始 token |
+| 审计 | admin.audit.read | 允许 | 允许 | 只读脱敏视图；不得导出秘密字段或更改审计数据 |
+| RBAC | rbac.role.read | 禁止 | 允许 | admin 不得查看或管理内部授权配置 |
+| RBAC | rbac.role.assign / rbac.role.revoke / rbac.permission.manage | 禁止 | 允许 | super_admin 操作需重新认证、原因、审计；建议双人复核 |
+| 安全配置 | security.config.read / security.config.update | 禁止 | 允许 | secret 值不可回显；更新需审计与重新认证 |
+| 自身账号 | user.read_self / user.update_self | 仅本人 | 仅本人 | 不可修改角色、状态、配额或其他用户资料 |
+| 自身会话 | session.read_self / session.revoke_self | 仅本人 | 仅本人 | 用户可撤销自己的其他设备 session |
+| OAuth | oauth.link_self / oauth.unlink_self | 仅本人 | 仅本人 | 需重新认证并验证 OAuth state |
+
+**admin 配额调整限制：** 本表只定义权限边界，不定义任何具体产品配额、计费或域名额度规则。配额调整必须记录 before/after、单位、原因、操作者、目标用户、request_id；不能通过普通用户资料接口修改。admin 不可调整管理员账号配额。super_admin 可管理策略上限，但不得借此绕过未来独立的产品/财务审批规则。
+
+**数据库约束：** roles、permissions、role_permissions、user_roles 仍是唯一授权关系。普通 Web 应用 DB role 不应拥有 user_roles/role_permissions 的直接 INSERT/UPDATE/DELETE 权限；授权写操作经受控服务路径执行。用户注册 DTO/更新 DTO 不包含 role 字段，服务端拒绝客户端传入 role、roles、permissions、status 等受保护字段。
+
+### 15.2 audit_logs 哈希链：最终字段、写入和校验流程
+
+**最终 audit_logs 追加字段：**
+- chain_id UUID NOT NULL：链标识；单链部署可固定一个链 ID。
+- sequence_no BIGINT NOT NULL：链内顺序号；对 (chain_id, sequence_no) 建 UNIQUE。
+- prev_hash BYTEA NOT NULL：上一条事件 entry_hash；首条使用固定 genesis hash。
+- entry_hash BYTEA NOT NULL：当前事件哈希。
+- actor_ref TEXT NOT NULL：匿名稳定主体标识；不含邮箱、姓名等个人信息。
+- actor_type TEXT NOT NULL：user、admin、super_admin、system、anonymous 等受控枚举值。
+
+原字段 actor_user_id、target_user_id 保留为可空 UUID 外键；最终 FK 均为 ON DELETE SET NULL。用户软删除时不删除审计行，匿名化时可将 actor_user_id 置 NULL，actor_ref 保留用于关联同一匿名主体。target_user_id 同理可置 NULL；如需保留目标关联，也使用不含直接身份信息的 target_ref。禁止 ON DELETE CASCADE。
+
+**prev_hash 的生成责任：** prev_hash 和 entry_hash 均由服务端审计写入模块在 INSERT 前计算，并作为 INSERT 字段写入 audit_logs；数据库不依赖触发器替应用补算，也不允许应用先插空值再回填。规范化事件内容使用固定 canonical JSON 序列化（字段排序、UTF-8、时间统一 UTC、数字格式稳定），entry_hash = SHA-256(chain_id || sequence_no || occurred_at || canonical_event || prev_hash)。哈希字段使用固定长度 BYTEA。
+
+**并发写入串行化：** 审计写入模块在同一数据库事务开始时取得固定 chain_id 对应的事务级 advisory lock；取得锁后读取该链最新一条 audit_logs 的 sequence_no 和 entry_hash，生成下一 sequence_no、prev_hash、entry_hash，再执行单条 INSERT 并提交。由于锁持有至事务结束，同一链的并发写入会串行，不会产生分叉。可用数据库 sequence 分配 sequence_no，但必须接受回滚造成的编号空洞；校验逻辑以 prev_hash 链接关系为准，不要求 sequence_no 连续。若采用 sequence，仍必须在 advisory lock 下读取上一条已提交哈希。应用角色只有 INSERT 权限；读取链尾需要单独授予 audit writer 最小 SELECT 权限（仅允许读取 chain_id、sequence_no、entry_hash），不得授予 UPDATE/DELETE。更严格部署可把读取链尾封装在受控 SECURITY DEFINER 函数中，但函数不得提供修改/删除能力。
+
+**校验任务：**
+- 每小时由独立调度器触发一次完整在线链校验；小规模可用 Kubernetes CronJob / DigitalOcean 定时任务 / 外部 CI scheduler，生产推荐独立 worker + scheduler，不依赖 Web 实例存活。
+- 每次校验从最近一次已签名检查点开始，重算 canonical event、prev_hash 和 entry_hash，验证 sequence 顺序、唯一性及链头一致性。
+- 每日 UTC 02:00 生成全量/分区校验报告与签名检查点；校验失败、缺行、链断裂、哈希不符或任务连续两次未运行时，向运维告警并冻结归档成功标记。
+- 每次归档前必须再次校验待归档分区；恢复演练时从归档对象独立验证签名与哈希链。
+
+**WORM 目标与保留：** 生产归档目标明确采用 AWS S3 Bucket + S3 Object Lock，启用版本控制和默认 Compliance mode retention；每日写入加密归档对象（SSE-KMS），对象名按环境/年月/分区/批次生成，写入后禁止覆盖或删除。归档保留期设为 **7 年**；如运营地法律要求更长则从其规定，若法律要求更短则先经法律/隐私审查后调整。签名私钥由独立 KMS/HSM 管理，不能与应用数据库权限共用。R2 可作为普通副本或跨区域副本，但本设计不把它作为唯一 WORM 合规归档目标。归档读取必须独立授权并记录访问审计。
+
+### 15.3 actor_user_id 最终外键定义
+
+最终定义明确为：
+- audit_logs.actor_user_id UUID NULL REFERENCES users(id) ON DELETE SET NULL；
+- audit_logs.target_user_id UUID NULL REFERENCES users(id) ON DELETE SET NULL；
+- audit_logs.actor_ref TEXT NOT NULL；
+- audit_logs.actor_type TEXT NOT NULL；
+- 可选 target_ref TEXT NULL，用于目标用户删除后仍保留匿名关联。
+
+不采用级联删除，也不强制保留已删除用户的 users 行。创建审计事件时即生成 actor_ref：登录用户使用服务端 HMAC_KEY 对稳定内部 user UUID 派生；匿名/系统事件使用对应主体类型和不可逆标识。HMAC 密钥轮换需保留 key version 标记（例如 actor_ref_key_version），但不得将密钥写入数据库。用户删除或匿名化不修改既有哈希链内容；必要的隐私处理以新的审计事件表达。
+
+### 15.4 会话管理页面与接口：超限自助处理
+
+**产品页面：** 在账户安全设置中提供“会话管理”页面，列出当前账号全部有效 session，字段仅展示：
+- 当前设备标记（当前会话显示“本设备”）；
+- 设备/浏览器摘要（由 user_agent 解析后截断，不显示完整原始 UA）；
+- 最近活动时间 last_seen_at；
+- 创建时间 created_at；
+- 大致 IP 前缀/地区提示（按隐私政策；不展示精确地址）；
+- 空闲过期时间和绝对过期时间；
+- 当前会话标记及“退出此设备”操作。
+
+列表按最近活动时间倒序。页面顶部显示活跃设备数量与上限 5。用户可撤销任意一个非当前 session，也可撤销当前 session（撤销后清 Cookie 并跳转登录页）；提供“退出其他所有设备”按钮，保留当前 session。不要向前端暴露 session token、token_hash、内部风控秘密或可用于接管会话的凭据。
+
+**接口设计（仅设计，不实现）：**
+- GET /api/v1/me/sessions：需要有效登录 session；返回当前用户自己的 session 摘要、current_session_id、active_count、max_active_sessions=5。只返回当前 user_id 的记录。
+- DELETE /api/v1/me/sessions/:sessionId：需要有效登录 session + CSRF token + 精确 Origin 校验；服务端从认证上下文取得 actor_user_id，并在 SQL 条件中同时限定 sessionId 与 user_id=actor_user_id。不能接受客户端传入 actor_user_id。撤销目标 session 后清理对应 Cookie 仅在撤销的是当前 session 时执行。
+- POST /api/v1/me/sessions/revoke-others：需要有效登录 session + CSRF + Origin 校验；只撤销 user_id=当前用户且 id 不等于当前 session 的其他会话。
+- 对 session 列表不允许通过 IDOR 查询其他用户 session；不存在与不属于当前用户的 session 对外返回相同结果，避免枚举。
+
+**审计要求：** 每次撤销写入 audit_logs：
+- action=session.revoke_self，target_user_id 为本人，metadata 包含被撤销 session 的内部 ID、是否当前会话、原因类别（user_device_management）；
+- 批量撤销使用 action=session.revoke_others，记录数量及 session ID 列表的不可逆摘要，不记录 token 或 token_hash；
+- 管理员代用户撤销仍使用独立 action=session.revoke_admin，记录 admin actor、目标用户、原因和工单号；必须具备 admin.session.revoke 权限并重新认证。
+- 用户撤销当前 session 后，审计事件必须先成功提交，再清除 Cookie 并返回成功；审计写入失败时撤销操作失败关闭，不允许静默完成而无审计。
+
+**与登录超限衔接：** 第 6 个并发登录被拒时，认证响应提供明确错误码 SESSION_LIMIT_REACHED，并引导用户登录已有设备打开会话管理页，撤销旧设备后再登录。若用户已无法访问旧设备，不提供绕过上限的匿名接口；走邮箱验证后的安全恢复流程（另行设计）或人工支持。不可在未认证状态下按用户提交的 sessionId 踢设备。
+
+## 16. 本轮验收补充
+
+- RBAC：users.role 在迁移完成后废弃并删除，不作缓存；权限矩阵未列出的操作默认拒绝；admin 无法操作管理员账号、支付状态或域名写状态。
+- Audit：prev_hash、entry_hash 在 INSERT 前由服务端写入；链写入串行化；每小时校验、每日签名归档；S3 Object Lock Compliance mode 保留 7 年。
+- Actor FK：actor_user_id/target_user_id 均 ON DELETE SET NULL；actor_ref/actor_type 保留匿名关联。
+- Sessions：用户可查看自己的会话并主动撤销设备；所有接口校验当前 session、user_id 归属、CSRF 和 Origin；撤销行为先审计后成功。
