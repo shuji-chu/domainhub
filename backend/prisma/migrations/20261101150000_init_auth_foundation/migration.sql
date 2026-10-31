@@ -260,3 +260,15 @@ CREATE TRIGGER audit_manifests_immutable BEFORE UPDATE OR DELETE ON audit_manife
 FOR EACH ROW EXECUTE FUNCTION prevent_sealed_audit_mutation();
 CREATE TRIGGER audit_logs_immutable_when_sealed BEFORE INSERT OR UPDATE OR DELETE ON audit_logs
 FOR EACH ROW EXECUTE FUNCTION prevent_sealed_audit_mutation();
+
+-- Composite integrity constraints keep each event bound to its shard chain and genesis anchor.
+ALTER TABLE audit_shards ADD CONSTRAINT audit_shards_id_chain_id_uq UNIQUE (id, chain_id);
+ALTER TABLE audit_shards ADD CONSTRAINT audit_shards_id_genesis_anchor_uq UNIQUE (id, genesis_anchor_hash);
+ALTER TABLE audit_manifests ADD CONSTRAINT audit_manifests_shard_hash_uq UNIQUE (shard_id, manifest_hash);
+ALTER TABLE audit_logs
+  ADD CONSTRAINT audit_logs_shard_chain_fk
+  FOREIGN KEY (shard_id, chain_id) REFERENCES audit_shards(id, chain_id) ON DELETE RESTRICT,
+  ADD CONSTRAINT audit_logs_shard_anchor_fk
+  FOREIGN KEY (shard_id, manifest_anchor_hash) REFERENCES audit_shards(id, genesis_anchor_hash) ON DELETE RESTRICT,
+  ADD CONSTRAINT audit_logs_source_manifest_fk
+  FOREIGN KEY (source_shard_id, source_manifest_hash) REFERENCES audit_manifests(shard_id, manifest_hash) ON DELETE RESTRICT;
