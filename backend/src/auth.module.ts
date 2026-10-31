@@ -7,6 +7,7 @@ import { randomBytes, createHash, createHmac, timingSafeEqual } from "node:crypt
 import { isIP } from "node:net";
 import * as argon2 from "argon2";
 import * as nodemailer from "nodemailer";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "./prisma.service";
 
 const COOKIE = process.env.SESSION_COOKIE_NAME || "__Host-domainhub_session";
@@ -19,10 +20,20 @@ function sha(value: string): Buffer { return createHash("sha256").update(value).
 function randomToken(): string { return randomBytes(32).toString("base64url"); }
 function ipPrefix(value?: string): string | undefined {
   if (!value) return undefined;
-  const ip = value.replace(/^::ffff:/, "");
+  const ip = value.trim().replace(/^::ffff:/i, "");
   if (isIP(ip) === 4) return ip.split(".").slice(0, 3).join(".") + ".0/24";
-  if (isIP(ip) === 6) return ip.split(":").slice(0, 4).join(":") + "::/56";
-  return undefined;
+  if (isIP(ip) !== 6) return undefined;
+
+  // Expand IPv6 before masking. Splitting a compressed address directly can
+  // produce invalid values such as "::1::/56", rejected by PostgreSQL INET.
+  const halves = ip.split("::");
+  const expand = (part: string): string[] => part ? part.split(":") : [];
+  const left = expand(halves[0]);
+  const right = expand(halves[1] || "");
+  const groups = [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill("0"), ...right];
+  if (groups.length !== 8 || groups.some(group => !/^[0-9a-f]{1,4}$/i.test(group))) return undefined;
+  const firstSevenBytes = (Number.parseInt(groups[3], 16) & 0xff00).toString(16);
+  return `${Number.parseInt(groups[0], 16).toString(16)}:${Number.parseInt(groups[1], 16).toString(16)}:${Number.parseInt(groups[2], 16).toString(16)}:${firstSevenBytes}::/56`;
 }
 function normalizeEmail(value: unknown): string {
   if (typeof value !== "string") throw new BadRequestException("邮箱格式不正确");
@@ -253,7 +264,12 @@ class AuthService {
         return { ...created, verificationToken: token };
       });
     } catch (error: any) {
-      if (error?.code === "P2002") return { message: "如果该邮箱可以注册，我们会发送验证邮件" };
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        log.error(`注册事务 Prisma 错误 code=${error.code} meta=${JSON.stringify(error.meta || {})}`);
+        if (error.code === "P2002") return { message: "如果该邮箱可以注册，我们会发送验证邮件" };
+      } else {
+        log.error(`注册事务非 KnownRequestError name=${error?.constructor?.name || "unknown"} code=${error?.code || "n/a"} meta=${JSON.stringify(error?.meta || {})} message=${error?.message || String(error)}`);
+      }
       throw error;
     }
     try {
