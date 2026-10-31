@@ -24,18 +24,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: package-lock.json
 
+      # The repository does not yet contain a committed package-lock.json.
+      # npm install creates one in the runner; commit it in a later dependency-freeze change.
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
 
       - name: Type check and production build
         run: npm run build
 
-      - name: Upload production build
+      - name: Upload build and generated dependency lock
         uses: actions/upload-artifact@v4
         with:
-          name: domainhub-dist
-          path: dist/
+          name: domainhub-build
+          path: |
+            dist/
+            package-lock.json
           if-no-files-found: error
