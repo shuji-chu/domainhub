@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter } from "@nestjs/platform-fastify";
 import { AppModule } from "../dist/app.module";
+import { PrismaService } from "../dist/prisma.service";
 
 process.env.NODE_ENV = "test";
 process.env.PUBLIC_APP_URL = "http://127.0.0.1:5173";
@@ -12,7 +13,7 @@ test("registration, one-time email verification, quota, login cookie, csrf and l
   await app.init();
   await app.listen(0, "127.0.0.1");
   const base = await app.getUrl();
-  const prisma = app.get("PrismaService");
+  const prisma = app.get(PrismaService);
   await prisma.session.deleteMany();
   await prisma.emailVerificationToken.deleteMany();
   await prisma.quotaLedger.deleteMany();
