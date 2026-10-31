@@ -93,4 +93,6 @@ jobs:
           SESSION_HASH_PEPPER: ci-session-pepper-not-for-production
           CSRF_SECRET: ci-csrf-secret-not-for-production
           RATE_LIMIT_HMAC_KEY: ci-rate-limit-key-not-for-production
+          TOKEN_HASH_PEPPER: ci-token-pepper-not-for-production
+          AUDIT_ACTOR_HMAC_KEY: ci-audit-actor-key-not-for-production
         run: npm run test:e2e
