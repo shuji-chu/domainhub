@@ -9,7 +9,7 @@ process.env.NODE_ENV = "test";
 process.env.PUBLIC_APP_URL = "http://127.0.0.1:5173";
 
 test("registration, one-time email verification, quota, login cookie, csrf and logout", async t => {
-  const app = await NestFactory.create(AppModule, new FastifyAdapter(), { logger: false });
+  const app = await NestFactory.create(AppModule, new FastifyAdapter(), { logger: ["error", "warn"] });
   await app.init();
   await app.listen(0, "127.0.0.1");
   const base = await app.getUrl();
@@ -29,7 +29,7 @@ test("registration, one-time email verification, quota, login cookie, csrf and l
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ email: "auth-e2e@example.test", password: "StrongPass1234" }),
   });
-  assert.equal(registration.status, 201);
+  assert.equal(registration.status, 201, await registration.clone().text());
   assert.match((await prisma.credential.findFirst({ where: { user: { emailNormalized: "auth-e2e@example.test" } } })).passwordHash, /^\\$argon2id\\$/);
   for (let i = 0; i < 2; i++) {
     const repeated = await fetch(base + "/auth/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "auth-e2e@example.test", password: "StrongPass1234" }) });
