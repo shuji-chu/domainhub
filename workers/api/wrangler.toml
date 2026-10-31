@@ -10,4 +10,4 @@ migrations_dir = "migrations"
 
 [vars]
 APP_ORIGIN = "https://dns.lynli.me"
-GITHUB_CALLBACK_URL = "https://domainhub-api.chulingli1988.workers.dev/auth/github/callback"
+GITHUB_CALLBACK_URL = "https://lynli.me/api/github-oauth/callback"
