@@ -41,6 +41,20 @@ jobs:
 
   backend-foundation:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: domainhub
+          POSTGRES_PASSWORD: domainhub
+          POSTGRES_DB: domainhub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U domainhub -d domainhub"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: backend
@@ -65,6 +79,9 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
+
+      - name: Apply initial migration to ephemeral CI database
+        run: npx prisma migrate deploy
 
       - name: Compile NestJS skeleton
         run: npm run build
