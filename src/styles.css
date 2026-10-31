@@ -261,3 +261,86 @@ main{display:block;padding-bottom:88px}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+
+/* 首页工具化重构：紧凑布局、中文优先、首屏直达库存 */
+:root{
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC","Microsoft YaHei",sans-serif;
+}
+.hero{
+  display:block;
+  min-height:0;
+  margin:16px 0 14px;
+  padding:20px 22px;
+  border:1px solid rgba(142,177,243,.24);
+  border-radius:10px;
+  background:rgba(11,23,43,.72);
+  box-shadow:none;
+}
+.hero:after{display:none}
+.hero-copy{max-width:720px}
+.hero-copy small{
+  margin:0 0 5px;
+  color:#8abaff;
+  font-size:11px;
+  letter-spacing:.04em;
+}
+.hero-copy h1{
+  margin:4px 0 8px;
+  font-size:clamp(25px,4vw,34px);
+  line-height:1.3;
+  letter-spacing:-.04em;
+}
+.hero-copy h1 em{color:#9bc8ff;background:none;-webkit-text-fill-color:currentColor}
+.hero-copy p{font-size:13px;line-height:1.65}
+.panel{
+  margin:12px 0 26px;
+  padding:18px 20px 22px;
+  border-radius:10px;
+  box-shadow:none;
+  background:rgba(10,20,38,.88);
+}
+.section-head h2,.panel h2{font-size:15px}
+.section-head p,.panel p{font-size:12px}
+.topbar{box-shadow:none}
+.top-actions button,.quota-pill,.claim,.section-head>button{border-radius:7px}
+.domain-row{padding:11px 1px}
+.searchbar{margin:12px 0 10px;border-radius:7px}
+@media(max-width:760px){
+  .hero{margin:12px 0 10px;padding:17px 16px}
+  .hero-copy{text-align:left}
+  .hero-copy small{font-size:10px}
+  .hero-copy h1{margin:3px 0 6px;font-size:27px;line-height:1.28}
+  .hero-copy p{font-size:12px;line-height:1.6}
+  .panel{margin:10px 0 22px;padding:15px 13px 18px}
+  .section-head{align-items:flex-start;gap:8px}
+  .section-head>div{min-width:0}
+  .section-head h2{font-size:14px}
+  .section-head p{font-size:11px}
+  .section-head>button{flex:0 0 auto;padding:7px 9px;font-size:10px}
+  .searchbar{margin:10px 0 8px;padding:9px 10px}
+  .domain-row{gap:8px;padding:10px 0}
+  .domain-row b{font-size:12px}
+  .domain-row small{font-size:10px}
+  .available{font-size:9px}
+  .claim{padding:7px 9px;font-size:10px}
+}
+@media(max-width:430px){
+  .app-shell{padding:0 12px}
+  .topbar{
+    width:calc(100% + 24px);margin:0 -12px;padding:9px 12px 7px;
+    display:grid;grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"brand actions" "nav nav";
+    gap:7px 8px;
+  }
+  .brand{font-size:14px;gap:6px}
+  .brand-mark{width:27px;height:27px;flex-basis:27px}
+  .top-actions{max-width:100%;gap:5px}
+  .top-actions button,.quota-pill{min-height:32px;padding:5px 7px;font-size:9px}
+  .main-nav{width:100%;justify-content:space-between;gap:4px;padding:4px 0 0}
+  .main-nav button{flex:1 1 0;min-width:0;min-height:34px;padding:6px 2px;font-size:11px}
+  .hero{margin:10px 0 9px;padding:15px 14px}
+  .hero-copy h1{font-size:25px}
+  .hero-copy p{font-size:11px}
+  .panel{padding:13px 11px 16px}
+}
