@@ -710,3 +710,31 @@ body{
   .main-nav button.active{color:#1559ad}
   .panel{background:rgba(255,255,255,.96)}
 }
+
+/* Final global blue-white system: quiet, readable, and motion-free */
+:root{color-scheme:light;background:#f5f9ff;color:#17324f;--ink:#17324f;--muted:#61758e;--line:#d8e5f2;--blue:#2878e8}
+html,body,#root{min-height:100%;background:#f5f9ff;color:#17324f}
+html{scroll-behavior:auto}
+body{background:linear-gradient(180deg,#edf5ff 0%,#f7faff 42%,#fff 100%) fixed}
+*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+button:hover,.primary:hover,.claim:hover{transform:none!important}
+.ambient-layer,.ambient-canvas,.app-shell:before{display:none!important}
+.auth-shell{background:linear-gradient(180deg,#eaf4ff 0%,#f7fbff 48%,#fff 100%)}
+.legal-consent{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:9px!important;margin:2px 0 0;color:#526c87!important;font-size:11px!important;line-height:1.8}
+.legal-consent input{flex:0 0 16px;width:16px!important;height:16px;min-height:16px!important;margin:3px 0 0;accent-color:#2878e8}
+.legal-consent span{display:block;min-width:0}
+.legal-consent button,.auth-footer button,.site-footer button{padding:0;color:#2878d8;background:transparent;border:0;font-size:inherit;text-decoration:underline;text-underline-offset:3px}
+.legal-consent button:hover,.auth-footer button:hover,.site-footer button:hover{color:#1559ad}
+.auth-footer{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:7px;text-align:center;font-size:11px}
+.site-footer{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;padding:4px 0 26px;color:#8295aa;font-size:11px}
+.legal-dialog{width:min(100%,620px);max-height:min(86vh,760px);padding:30px;overflow:auto}
+.legal-dialog h2{margin:5px 0 18px}
+.legal-dialog h3{margin:20px 0 6px;font-size:13px}
+.legal-dialog p{margin:7px 0;color:#526c87;font-size:12px;line-height:1.85}
+.legal-version{color:#2878d8;font-size:10px;letter-spacing:.08em}
+.legal-actions{display:flex;justify-content:flex-end;margin-top:24px}
+.legal-actions .primary{min-width:110px}
+.server-confirm-details{display:grid;gap:8px;margin:16px 0;padding:14px;background:#f4f8fd;border:1px solid #dce7f2;border-radius:10px;color:#23415f;font-size:12px}
+.server-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.server-confirm-actions>button:first-child{padding:9px 14px;color:#526c87;background:#f3f8fe;border:1px solid #d4e2f0;border-radius:8px}
+@media(max-width:520px){.legal-dialog{padding:25px 18px}.server-confirm-actions{flex-direction:column-reverse}.server-confirm-actions button{width:100%}.site-footer{padding-bottom:20px}}
