@@ -1,6 +1,6 @@
 name = "domainhub-api"
 main = "src/index.js"
-compatibility_date = "2026-11-01"
+compatibility_date = "2026-10-31"
 
 [[d1_databases]]
 binding = "DB"
