@@ -21,7 +21,7 @@ async function rateLimit(env,dimension,subject,windowMs,limit){const now=Date.no
 const rfc3986=value=>encodeURIComponent(String(value)).replace(/[!'()*]/g,c=>"%"+c.charCodeAt(0).toString(16).toUpperCase());
 async function sendMail(env,to,subject,html,text){
  if(!env.ALI_ACCESS_KEY_ID||!env.ALI_ACCESS_KEY_SECRET||!env.ALI_DM_ACCOUNT)throw Object.assign(new Error("邮件服务尚未配置"),{status:503});
- const params={AccessKeyId:env.ALI_ACCESS_KEY_ID,AccountName:env.ALI_DM_ACCOUNT,Action:"SingleSendMail",AddressType:"1",Format:"JSON",HtmlBody:html,RegionId:env.ALI_DM_REGION||"cn-hangzhou",ReplyToAddress:"true",SignatureMethod:"HMAC-SHA1",SignatureNonce:crypto.randomUUID(),SignatureVersion:"1.0",Subject:subject,TextBody:text,Timestamp:new Date().toISOString().replace(/\\.\\d{3}Z$/,"Z"),ToAddress:to,Version:"2015-11-23"};
+ const params={AccessKeyId:env.ALI_ACCESS_KEY_ID,AccountName:env.ALI_DM_ACCOUNT,Action:"SingleSendMail",AddressType:"1",Format:"JSON",HtmlBody:html,RegionId:env.ALI_DM_REGION||"cn-hangzhou",ReplyToAddress:"true",SignatureMethod:"HMAC-SHA1",SignatureNonce:crypto.randomUUID(),SignatureVersion:"1.0",Subject:subject,TextBody:text,Timestamp:new Date().toISOString().replace(/\.\d{3}Z$/,"Z"),ToAddress:to,Version:"2015-11-23"};
  const canonical=Object.keys(params).sort().map(k=>rfc3986(k)+"="+rfc3986(params[k])).join("&");
  const stringToSign="POST&%2F&"+rfc3986(canonical);
  const key=await crypto.subtle.importKey("raw",enc.encode(env.ALI_ACCESS_KEY_SECRET+"&"),{name:"HMAC",hash:"SHA-1"},false,["sign"]);
