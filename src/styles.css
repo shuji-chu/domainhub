@@ -465,3 +465,15 @@ main{display:block;padding-bottom:88px}
   .auth-shell{padding-right:14px;padding-left:14px}
   .auth-card{padding:22px 17px 19px}
 }
+
+/* Authentication recovery and GitHub OAuth controls */
+.auth-link{display:block;margin:13px auto 0;padding:5px 8px;color:#8fc8ff;background:transparent;border:0;font-size:11px}
+.auth-link:hover{color:#d9f4ff;text-shadow:0 0 16px rgba(83,180,255,.6)}
+.auth-divider{display:flex;align-items:center;gap:12px;margin:20px 0 14px;color:#7891b5;font-size:10px}
+.auth-divider:before,.auth-divider:after{content:"";height:1px;flex:1;background:rgba(132,171,235,.18)}
+.github-auth{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;min-height:46px;padding:10px 14px;color:#eaf4ff;background:rgba(13,27,49,.78);border:1px solid rgba(143,183,238,.28);border-radius:8px;font-size:12px;font-weight:600}
+.github-auth:hover{border-color:#76cfff;background:rgba(31,69,111,.62);box-shadow:0 0 28px rgba(63,153,255,.2);transform:translateY(-1px)}
+.github-auth svg{width:19px;height:19px;flex:0 0 19px}
+.auth-notice{margin:0;padding:10px 12px;color:#a9e8ce;background:rgba(26,133,93,.13);border:1px solid rgba(86,211,158,.24);border-radius:7px;font-size:11px;line-height:1.7}
+.auth-secondary-form{margin-top:24px}
+@media(max-width:390px){.auth-divider{margin:16px 0 12px}.github-auth{min-height:43px}}
