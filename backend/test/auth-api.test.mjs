@@ -30,7 +30,7 @@ test("registration, one-time email verification, quota, login cookie, csrf and l
     body: JSON.stringify({ email: "auth-e2e@example.test", password: "StrongPass1234" }),
   });
   assert.equal(registration.status, 201, await registration.clone().text());
-  assert.match((await prisma.credential.findFirst({ where: { user: { emailNormalized: "auth-e2e@example.test" } } })).passwordHash, /^\\$argon2id\\$/);
+  assert.match((await prisma.credential.findFirst({ where: { user: { emailNormalized: "auth-e2e@example.test" } } })).passwordHash, /^\$argon2id\$/);
   for (let i = 0; i < 2; i++) {
     const repeated = await fetch(base + "/auth/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "auth-e2e@example.test", password: "StrongPass1234" }) });
     assert.equal(repeated.status, 201);
