@@ -1,4 +1,4 @@
-const ALLOWED_ORIGINS=new Set(["https://dns.lynli.me","https://c86f58b3.domainhub-frontend.pages.dev","https://domainhub-frontend.pages.dev","https://2839aaa8.domainhub-admin-ui.pages.dev","https://domainhub-admin-ui.pages.dev"]);
+const ALLOWED_ORIGINS=new Set(["https://dns.lynli.me","https://c86f58b3.domainhub-frontend.pages.dev","https://domainhub-frontend.pages.dev","https://2839aaa8.domainhub-admin-ui.pages.dev","https://domainhub-admin-ui.pages.dev","https://admin.lynli.me"]);
 const ADMIN_EMAIL="boss@lynli.me";
 const DNSHE_BASE="https://api005.dnshe.com/index.php?m=dns";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"Content-Type, Authorization","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Vary":"Origin"};
