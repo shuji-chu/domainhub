@@ -160,9 +160,80 @@ class SessionGuard implements CanActivate {
 }
 
 @Injectable()
+class AuditService {
+  constructor(private readonly db: PrismaService) {}
+  private canonical(value: any): string {
+    const sorted = (input: any): any => Array.isArray(input) ? input.map(sorted) :
+      input && typeof input === "object" ? Object.fromEntries(Object.keys(input).sort().map(k => [k, sorted(input[k])])) : input;
+    return JSON.stringify(sorted(value));
+  }
+  async record(input: {
+    action: string; outcome: "success" | "failure" | "blocked";
+    actorUserId?: string; targetUserId?: string; actorType?: string;
+    requestId?: string; ip?: string; userAgent?: string; metadata?: Record<string, unknown>;
+  }): Promise<void> {
+    const now = new Date();
+    const hour = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours()));
+    const shardKey = `primary:${hour.toISOString()}`;
+    const genesis = sha(`domainhub-audit-genesis-v1:${shardKey}`);
+    const actorKey = process.env.AUDIT_ACTOR_HMAC_KEY || process.env.TOKEN_HASH_PEPPER;
+    if (!actorKey) throw new Error("AUDIT_ACTOR_HMAC_KEY must be configured");
+    const actorRef = createHmac("sha256", actorKey).update(input.actorUserId || "anonymous").digest("hex");
+    const metadata = this.canonical(input.metadata || {});
+    const occurredAt = now.toISOString();
+    const event = this.canonical({
+      action: input.action, outcome: input.outcome, actorRef,
+      actorType: input.actorType || (input.actorUserId ? "user" : "anonymous"),
+      targetUserId: input.targetUserId || null, requestId: input.requestId || null,
+      ipPrefix: ipPrefix(input.ip) || null,
+      userAgentHash: input.userAgent ? sha(input.userAgent).toString("hex") : null,
+      metadata: JSON.parse(metadata),
+    });
+    await this.db.$transaction(async tx => {
+      const proposedShardId = randomBytes(16).toString("hex");
+      const proposedChainId = randomBytes(16).toString("hex");
+      await tx.$executeRaw`INSERT INTO audit_shards
+        (id, shard_key, chain_id, kind, state, hour_started_at, genesis_anchor_hash)
+        VALUES (${proposedShardId}::uuid, ${shardKey}, ${proposedChainId}::uuid,
+          'primary'::audit_shard_kind, 'open'::audit_shard_state, ${hour}, ${genesis})
+        ON CONFLICT (hour_started_at) WHERE kind = 'primary' DO NOTHING`;
+      const shards = await tx.$queryRaw<Array<{id:string; chain_id:string; genesis_anchor_hash:Buffer}>>`
+        SELECT id, chain_id, genesis_anchor_hash FROM audit_shards
+        WHERE kind = 'primary'::audit_shard_kind AND hour_started_at = ${hour} FOR UPDATE`;
+      const shard = shards[0];
+      if (!shard) throw new Error("Unable to establish audit shard");
+      await tx.$executeRaw`INSERT INTO audit_chain_heads (shard_id, chain_id, sequence_no, last_hash)
+        VALUES (${shard.id}::uuid, ${shard.chain_id}::uuid, 0, ${shard.genesis_anchor_hash})
+        ON CONFLICT (shard_id) DO NOTHING`;
+      const heads = await tx.$queryRaw<Array<{sequence_no: bigint; last_hash: Buffer}>>`
+        SELECT sequence_no, last_hash FROM audit_chain_heads WHERE shard_id = ${shard.id}::uuid FOR UPDATE`;
+      const head = heads[0];
+      if (!head) throw new Error("Unable to lock audit chain head");
+      const sequence = head.sequence_no + 1n;
+      const prevHash = Buffer.from(head.last_hash);
+      const entryHash = createHash("sha256")
+        .update(shard.chain_id).update("\0").update(sequence.toString()).update("\0")
+        .update(occurredAt).update("\0").update(event).update("\0").update(prevHash).digest();
+      await tx.$executeRaw`INSERT INTO audit_logs
+        (shard_id, shard_kind, chain_id, sequence_no, occurred_at, prev_hash, entry_hash,
+         manifest_anchor_hash, actor_user_id, target_user_id, actor_ref, actor_type,
+         action, outcome, request_id, ip_prefix, user_agent_hash, metadata)
+        VALUES (${shard.id}::uuid, 'primary'::audit_shard_kind, ${shard.chain_id}::uuid,
+          ${sequence}, ${now}, ${prevHash}, ${entryHash}, ${shard.genesis_anchor_hash},
+          ${input.actorUserId || null}::uuid, ${input.targetUserId || null}::uuid,
+          ${actorRef}, ${input.actorType || (input.actorUserId ? "user" : "anonymous")},
+          ${input.action}, ${input.outcome}::audit_outcome, ${input.requestId || null},
+          ${ipPrefix(input.ip) || null}::inet, ${input.userAgent ? sha(input.userAgent) : null}, ${metadata}::jsonb)`;
+      await tx.$executeRaw`UPDATE audit_chain_heads SET sequence_no = ${sequence},
+        last_hash = ${entryHash}, updated_at = ${now} WHERE shard_id = ${shard.id}::uuid`;
+    });
+  }
+}
+
+@Injectable()
 class AuthService {
-  constructor(private readonly db: PrismaService, private readonly mailer: Mailer) {}
-  async register(body: any, ip?: string): Promise<{ message: string }> {
+  constructor(private readonly db: PrismaService, private readonly mailer: Mailer, private readonly audit: AuditService) {}
+  async register(body: any, ip?: string, req?: any): Promise<{ message: string }> {
     const email = normalizeEmail(body?.email);
     if (!passwordValid(body?.password)) throw new BadRequestException("密码至少 12 位，且须包含大小写字母和数字");
     const passwordHash = await argon2.hash(body.password, {
@@ -185,7 +256,13 @@ class AuthService {
       if (error?.code === "P2002") return { message: "如果该邮箱可以注册，我们会发送验证邮件" };
       throw error;
     }
-    await this.mailer.sendVerification(user.email, user.verificationToken);
+    try {
+      await this.mailer.sendVerification(user.email, user.verificationToken);
+      await this.audit.record({ action: "auth.register", outcome: "success", actorUserId: user.id, targetUserId: user.id, requestId: req?.id, ip, userAgent: req?.headers?.["user-agent"] });
+    } catch (error) {
+      await this.audit.record({ action: "auth.register", outcome: "failure", actorUserId: user.id, targetUserId: user.id, requestId: req?.id, ip, userAgent: req?.headers?.["user-agent"], metadata: { stage: "verification_email_delivery" } });
+      throw error;
+    }
     return { message: "如果该邮箱可以注册，我们会发送验证邮件" };
   }
   async sendVerification(body: any, ip?: string): Promise<{ message: string }> {
@@ -205,10 +282,11 @@ class AuthService {
     }
     return { message: "如果该邮箱对应待验证账号，我们会发送验证邮件" };
   }
-  async verifyEmail(body: any): Promise<{ message: string; quotaAwarded: number }> {
+  async verifyEmail(body: any, req?: any): Promise<{ message: string; quotaAwarded: number }> {
     if (typeof body?.token !== "string" || body.token.length < 30) throw new BadRequestException("验证链接无效或已过期");
     const tokenHash = sha(body.token);
-    return this.db.$transaction(async tx => {
+    try {
+    const result = await this.db.$transaction(async tx => {
       const token = await tx.emailVerificationToken.findUnique({ where: { tokenHash } });
       const now = new Date();
       if (!token || token.consumedAt || token.expiresAt <= now) throw new BadRequestException("验证链接无效或已过期");
@@ -222,14 +300,21 @@ class AuthService {
           idempotencyKey: `email_verification:${user.id}`, reason: "邮箱验证奖励" }],
         skipDuplicates: true,
       });
-      return { message: "邮箱验证成功", quotaAwarded: 1 };
+      return { userId: user.id, message: "邮箱验证成功", quotaAwarded: 1 };
     });
+    await this.audit.record({ action: "auth.email_verification", outcome: "success", actorUserId: result.userId, targetUserId: result.userId, requestId: req?.id, ip: req?.ip, userAgent: req?.headers?.["user-agent"] });
+    return { message: result.message, quotaAwarded: result.quotaAwarded };
+    } catch (error) {
+      await this.audit.record({ action: "auth.email_verification", outcome: "failure", requestId: req?.id, ip: req?.ip, userAgent: req?.headers?.["user-agent"], metadata: { reason: "invalid_or_expired_token" } });
+      throw error;
+    }
   }
   async login(body: any, req: any): Promise<{ user: { id: string; email: string } }> {
     const email = normalizeEmail(body?.email);
     const user = await this.db.user.findUnique({ where: { emailNormalized: email }, include: { credential: true } });
     const valid = user?.credential ? await argon2.verify(user.credential.passwordHash, String(body?.password || "")) : false;
     if (!user || !valid || user.status !== "active" || !user.emailVerifiedAt || !user.credential) {
+      await this.audit.record({ action: "auth.login", outcome: "failure", targetUserId: user?.id, requestId: req.id, ip: req.ip, userAgent: req.headers["user-agent"], metadata: { reason: "invalid_credentials_or_inactive" } });
       throw new UnauthorizedException("邮箱或密码错误");
     }
     const now = new Date();
@@ -248,12 +333,14 @@ class AuthService {
       return session;
     });
     req.authCookie = raw;
+    await this.audit.record({ action: "auth.login", outcome: "success", actorUserId: user.id, targetUserId: user.id, requestId: req.id, ip: req.ip, userAgent: req.headers["user-agent"] });
     return { user: { id: user.id, email: user.email } };
   }
   async logout(req: any): Promise<void> {
-    if (req.user?.sessionId) await this.db.session.updateMany({
-      where: { id: req.user.sessionId, revokedAt: null }, data: { revokedAt: new Date() },
-    });
+    if (req.user?.sessionId) {
+      const result = await this.db.session.updateMany({ where: { id: req.user.sessionId, revokedAt: null }, data: { revokedAt: new Date() } });
+      if (result.count === 1) await this.audit.record({ action: "auth.logout", outcome: "success", actorUserId: req.user.id, targetUserId: req.user.id, requestId: req.id, ip: req.ip, userAgent: req.headers["user-agent"] });
+    }
   }
   csrf(raw: string): string {
     const key = process.env.CSRF_SECRET || process.env.SESSION_HASH_PEPPER || "development-only-change-me";
@@ -267,13 +354,13 @@ class AuthController {
   @Post("register")
   @UseGuards(AuthRateLimitGuard)
   async register(@Req() req: any, @Res({ passthrough: true }) res: any): Promise<any> {
-    return this.auth.register(req.body, req.ip);
+    return this.auth.register(req.body, req.ip, req);
   }
   @Post("email/verification/send")
   @UseGuards(AuthRateLimitGuard)
   async sendVerification(@Req() req: any): Promise<any> { return this.auth.sendVerification(req.body, req.ip); }
   @Post("email/verify")
-  async verify(@Req() req: any): Promise<any> { return this.auth.verifyEmail(req.body); }
+  async verify(@Req() req: any): Promise<any> { return this.auth.verifyEmail(req.body, req); }
   @Post("login")
   @UseGuards(AuthRateLimitGuard)
   async login(@Req() req: any, @Res({ passthrough: true }) res: any): Promise<any> {
@@ -303,7 +390,7 @@ class AuthController {
 
 @Module({
   controllers: [AuthController],
-  providers: [PrismaService, Mailer, AuthService, RateLimitService, AuthRateLimitGuard, SessionGuard],
+  providers: [PrismaService, Mailer, AuditService, AuthService, RateLimitService, AuthRateLimitGuard, SessionGuard],
   exports: [SessionGuard, PrismaService],
 })
 export class AuthModule {}
