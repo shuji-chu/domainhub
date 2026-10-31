@@ -53,3 +53,88 @@ body{background:radial-gradient(ellipse at 50% -15%,#182d55 0%,#0a1326 42%,#0509
 .form-error{color:#ff9baf!important}.toast{background:rgba(12,27,51,.95);border:1px solid rgba(115,174,255,.28);color:#eaf2ff;box-shadow:0 12px 40px rgba(0,0,0,.35)}
 .hint{color:#8ea4c7}
 @media(max-width:650px){.app-shell{padding:0 12px}.topbar{margin:0 -12px;padding:0 12px}.hero{padding:28px 18px}.hero-art{opacity:.7}}
+
+
+/* Layout repair: explicit, collision-proof navigation and hero grid */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  width:calc(100% + 64px);min-height:72px;height:auto;
+  gap:clamp(16px,3vw,44px);padding:12px 32px;margin:0 -32px;
+}
+.brand{display:inline-flex;align-items:center;flex:0 0 auto;white-space:nowrap;min-width:max-content}
+.brand-mark{display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px}
+.brand-mark svg{width:19px;height:19px}
+.main-nav{
+  position:static!important;inset:auto!important;transform:none!important;
+  display:flex;align-items:center;justify-content:center;gap:clamp(18px,3vw,38px);
+  flex:1 1 auto;min-width:0;margin:0;padding:0;
+}
+.main-nav button{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;min-height:44px;padding:10px 2px;font-size:13px}
+.top-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex:0 0 auto;min-width:max-content}
+.top-actions button,.quota-pill{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;min-height:38px;padding:8px 13px;font-size:12px}
+.top-actions>span{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b8c9e4;font-size:12px}
+.hero{
+  display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);
+  align-items:center;justify-content:space-between;gap:clamp(32px,6vw,88px);
+  min-height:340px;margin:34px 0 26px;padding:clamp(34px,5vw,68px);
+}
+.hero-copy{min-width:0;max-width:680px}
+.hero-copy small{display:inline-block;margin-bottom:8px;line-height:1.6}
+.hero-copy h1{margin:12px 0 18px;line-height:1.2;overflow-wrap:anywhere}
+.hero-copy p{max-width:520px;line-height:1.9;margin:0}
+.hero-art{
+  width:100%;min-width:0;min-height:230px;height:auto;aspect-ratio:1.45/1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:22px;padding:28px;text-align:center;transform:none;
+}
+.hero-art-icon{display:grid;place-items:center;width:104px;height:104px;border-radius:28px;
+  background:rgba(72,145,255,.12);border:1px solid rgba(132,196,255,.42);
+  box-shadow:0 0 42px rgba(67,151,255,.2),inset 0 1px rgba(255,255,255,.16)}
+.hero-art-icon svg{display:block;flex:0 0 auto}
+.hero-art-copy{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+.hero-art-copy b{display:block;font-size:clamp(12px,1.2vw,15px);letter-spacing:.16em;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
+.hero-art-copy span{font-size:12px;letter-spacing:.12em}
+.hero-art-copy small{font-size:11px;color:#91acd2;letter-spacing:.04em}
+main{padding-bottom:76px}
+main>.panel{margin-bottom:48px;padding-bottom:30px}
+main>.panel .domain-row:last-of-type{margin-bottom:14px}
+.domain-row{min-width:0}
+.domain-row>div{min-width:0;flex:1 1 auto}
+.domain-row b,.domain-row small{overflow-wrap:anywhere}
+@media(max-width:760px){
+  .app-shell{padding:0 16px}
+  .topbar{
+    display:grid;grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"brand actions" "nav nav";
+    align-items:center;column-gap:10px;row-gap:8px;
+    width:calc(100% + 32px);margin:0 -16px;padding:12px 16px;
+    min-height:unset;
+  }
+  .brand{grid-area:brand;font-size:16px}
+  .brand-mark{width:30px;height:30px;flex-basis:30px}
+  .main-nav{
+    grid-area:nav;width:100%;display:flex;justify-content:center;gap:clamp(18px,7vw,34px);
+    padding:0 0 2px;border-top:1px solid rgba(151,184,255,.12);
+  }
+  .main-nav button{min-height:38px;padding:9px 1px;font-size:12px}
+  .top-actions{grid-area:actions;gap:6px}
+  .top-actions button,.quota-pill{min-height:34px;padding:7px 9px;font-size:11px}
+  .top-actions>span{display:none}
+  .hero{grid-template-columns:minmax(0,1fr);gap:26px;min-height:0;margin:22px 0 18px;padding:28px 22px}
+  .hero-copy h1{font-size:clamp(34px,9vw,46px)}
+  .hero-art{width:100%;min-height:190px;aspect-ratio:auto;gap:15px;padding:22px}
+  .hero-art-icon{width:78px;height:78px;border-radius:22px}
+  .hero-art-icon svg{width:48px;height:48px}
+  main{padding-bottom:56px}
+  main>.panel{margin-bottom:34px;padding-bottom:24px}
+}
+@media(max-width:380px){
+  .app-shell{padding:0 12px}
+  .topbar{width:calc(100% + 24px);margin:0 -12px;padding:10px 12px}
+  .brand{font-size:14px;gap:6px}
+  .brand-mark{width:27px;height:27px;flex-basis:27px}
+  .top-actions button,.quota-pill{padding:6px 7px;font-size:10px}
+  .main-nav{gap:16px}
+  .main-nav button{font-size:11px}
+  .hero{padding:24px 17px}
+}
