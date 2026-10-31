@@ -1,99 +1,15 @@
-import { useMemo, useState } from 'react'
-import { Search, Globe2, ChevronDown, Menu, X, Github, Send, Users, ShieldCheck } from 'lucide-react'
-import { demoDomains, demoSuffixes } from './mock/domains'
-
-export default function App() {
-  const [keyword, setKeyword] = useState('')
-  const [suffix, setSuffix] = useState('全部后缀')
-  const [menuOpen, setMenuOpen] = useState(false)
-
-  const results = useMemo(() => {
-    const term = keyword.trim().toLowerCase()
-    return demoDomains.filter((domain) => {
-      const matchesName = !term || domain.fqdn.toLowerCase().includes(term)
-      const matchesSuffix = suffix === '全部后缀' || domain.suffix === suffix
-      return matchesName && matchesSuffix
-    })
-  }, [keyword, suffix])
-
-  return <div className="site">
-    <header className="header">
-      <a className="brand" href="#home" aria-label="DomainHub 首页">
-        <img src="/logo.svg" alt="" /><span>Domain<span>Hub</span></span>
-      </a>
-      <button className="menu-toggle" onClick={() => setMenuOpen((open) => !open)} aria-label={menuOpen ? '关闭菜单' : '打开菜单'} aria-expanded={menuOpen}>
-        {menuOpen ? <X size={21}/> : <Menu size={21}/>}
-      </button>
-      <nav className={menuOpen ? 'nav open' : 'nav'} aria-label="主导航">
-        <a href="#domains" onClick={() => setMenuOpen(false)}>域名查询</a>
-        <a href="#features" onClick={() => setMenuOpen(false)}>功能说明</a>
-        <a href="#tasks" onClick={() => setMenuOpen(false)}>活动规则</a>
-        <a href="#help" onClick={() => setMenuOpen(false)}>帮助</a>
-      </nav>
-      <div className="account-actions">
-        <span className="not-open-label">账号功能未开放</span>
-      </div>
-    </header>
-
-    <main id="home">
-      <section className="intro">
-        <div className="intro-copy">
-          <div className="eyebrow"><span/> DOMAINHUB · 域名服务</div>
-          <h1>免费域名查询与<br/><em>DNS 管理平台</em></h1>
-          <p>简洁、直接地查询域名，管理你的网络入口。</p>
-          <a className="primary" href="#domains">查询域名 <Search size={16}/></a>
-        </div>
-        <div className="intro-aside">
-          <div><Globe2/><b>域名查询</b><span>搜索可用后缀与域名</span></div>
-          <div><ShieldCheck/><b>安全优先</b><span>账号与风控先行建设</span></div>
-        </div>
-      </section>
-
-      <section className="panel domain-panel" id="domains">
-        <div className="section-head">
-          <div><h2>域名查询</h2><p>输入名称并选择后缀，筛选当前演示列表。</p></div>
-          <span className="demo-badge">演示数据</span>
-        </div>
-        <div className="searchbar">
-          <Search className="search-icon" size={19}/>
-          <input value={keyword} onChange={(event) => setKeyword(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') setKeyword('') }} placeholder="输入域名前缀或完整域名" aria-label="搜索域名"/>
-          <label className="suffix-select">
-            <select value={suffix} onChange={(event) => setSuffix(event.target.value)} aria-label="域名后缀">
-              {demoSuffixes.map((item) => <option key={item}>{item}</option>)}
-            </select>
-            <ChevronDown size={15}/>
-          </label>
-          <button className="search-button" type="button" onClick={() => document.getElementById('domain-results')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}>查询</button>
-        </div>
-        <div className="suffix-chips" aria-label="快速筛选后缀">
-          {demoSuffixes.map((item) => <button type="button" key={item} className={suffix === item ? 'chip selected' : 'chip'} onClick={() => setSuffix(item)}>{item === '全部后缀' ? '全部' : item}</button>)}
-        </div>
-        <div className="results-heading" id="domain-results"><b>查询结果</b><span>{results.length} 条演示记录</span></div>
-        {results.length > 0 ? <div className="domain-list">{results.map((domain) => <article className="domain-row" key={domain.fqdn}>
-          <div className="domain-icon"><Globe2 size={18}/></div>
-          <div className="domain-info"><b>{domain.fqdn}</b><small>{domain.note}</small></div>
-          <span className="preview-status">演示条目</span>
-          <span className="not-available">领取未开放</span>
-        </article>)}</div> : <div className="empty-state">没有匹配的演示域名，请更换关键词或后缀。</div>}
-        <p className="data-disclaimer">以上仅为本地演示数据，不代表真实注册状态、库存或域名可用性。当前版本仅提供前端筛选，不会执行注册或领取。</p>
-      </section>
-
-      <section className="panel feature-panel" id="features">
-        <div className="section-head"><div><h2>平台功能</h2><p>按安全顺序逐步开放，未开放功能不会执行操作。</p></div></div>
-        <div className="feature-list">
-          <article><div className="feature-icon"><Github/></div><div><b>GitHub 登录 / 邮箱账号</b><p>账号体系建设中，暂未开放注册和登录。</p></div><span className="state">未开放</span></article>
-          <article><div className="feature-icon"><Globe2/></div><div><b>域名列表与查询</b><p>当前仅展示演示数据；真实只读数据接口尚未接入。</p></div><span className="state">演示阶段</span></article>
-          <article><div className="feature-icon"><ShieldCheck/></div><div><b>DNS / Cloudflare</b><p>待账号、风控和域名数据模块完成后开发。</p></div><span className="state">未开放</span></article>
-        </div>
-      </section>
-
-      <section className="panel task-panel" id="tasks">
-        <div className="section-head"><div><h2>社区活动</h2><p>Telegram 仅用于身份绑定、任务验证和通知，不作为登录方式。</p></div><span className="state">未开放</span></div>
-        <div className="task-note"><Send size={19}/><div><b>TG 任务奖励规则</b><p>绑定机器人并加入指定群组，两项完成后合计奖励 1 个名额。验证功能尚未开放。</p></div></div>
-        <div className="task-actions"><button disabled><Send size={16}/>绑定机器人 · 未开放</button><button disabled><Users size={16}/>群组验证 · 未开放</button></div>
-      </section>
-    </main>
-
-    <footer id="help"><a className="brand" href="#home"><img src="/logo.svg" alt=""/><span>Domain<span>Hub</span></span></a><p>DomainHub · 域名查询与 DNS 管理平台</p><small>当前为开发预览，真实域名注册、领取、DNS 修改及支付均未开放。</small></footer>
-  </div>
-}
+import {useMemo,useState} from 'react';import{Search,Globe2,ChevronDown,Menu,X,Github,Gift,UserCircle2,Plus,Trash2,Settings,Check,LogIn,LogOut}from'lucide-react';import type{FormEvent}from'react';
+const suffixes=['全部后缀','abrdns.com','de5.net','qd.je','kz.ci','cc.cd'];const seed=[['brightpath.abrdns.com','abrdns.com'],['cloudnest.de5.net','de5.net'],['pixelwave.qd.je','qd.je'],['northstar.kz.ci','kz.ci'],['blueorbit.cc.cd','cc.cd'],['mystudio.abrdns.com','abrdns.com']].map(([fqdn,suffix])=>({fqdn,suffix,available:true}));
+export default function App(){const[tab,T]=useState('home'),[q,Q]=useState(''),[s,S]=useState(suffixes[0]),[quota,A]=useState(3),[domains,D]=useState(seed),[owned,O]=useState<string[]>([]),[tasks,K]=useState([['tg','绑定 Telegram',1],['gh','GitHub Star',1],['invite','邀请好友',2]].map(([id,name,reward])=>({id,name,reward,done:false}))),[modal,M]=useState<any>(null),[email,E]=useState('demo@domainhub.test'),[signed,SI]=useState(false),[records,R]=useState<any[]>([{id:1,type:'A',name:'@',value:'192.0.2.10'}]),[rt,RT]=useState('A'),[rn,RN]=useState(''),[rv,RV]=useState(''),[active,AC]=useState(''),[menu,MN]=useState(false);
+const list=useMemo(()=>domains.filter(d=>(s===suffixes[0]||d.suffix===s)&&(!q||d.fqdn.includes(q.toLowerCase()))),[domains,s,q]);
+const claim=(d:string)=>{if(quota<1){M({type:'msg',text:'配额不足，请先完成任务。'});return}A(x=>x-1);O(x=>[...x,d]);D(x=>x.filter(y=>y.fqdn!==d));M({type:'msg',text:'领取成功！已扣除 1 个配额（Mock）。'})};
+const auth=(e:FormEvent)=>{e.preventDefault();SI(true);M({type:'msg',text:'演示登录成功，未发送网络请求。'})};
+const add=(e:FormEvent)=>{e.preventDefault();R(x=>[...x,{id:Date.now(),type:rt,name:rn,value:rv}]);RN('');RV('');M({type:'msg',text:'DNS 记录已添加到本地演示列表。'})};
+return <div className="app-shell"><header className="topbar"><a className="brand" href="#" onClick={()=>T('home')}><span className="brand-mark"><Globe2/></span>Domain<span>Hub</span></a><button className="mobile-menu" onClick={()=>MN(!menu)}><Menu/></button><nav className={menu?'main-nav open':'main-nav'}>{[['home','域名首页'],['tasks','任务中心'],['account','用户中心']].map(([id,n])=><button className={tab===id?'active':''} onClick={()=>{T(id);MN(false)}}>{n}</button>)}</nav><div className="top-actions"><b className="quota-pill">配额 {quota}</b>{signed?<button onClick={()=>SI(false)}><LogOut/>退出</button>:<button onClick={()=>M({type:'auth',mode:'login'})}><LogIn/>登录 / 注册</button>}</div></header>
+<main>{tab==='home'&&<><section className="hero"><div><small>DOMAINHUB · 域名服务</small><h1>找到属于你的<br/><em>网络新入口</em></h1><p>搜索心仪域名，管理 DNS 记录，让每一个创意都有自己的地址。</p><button className="primary" onClick={()=>document.getElementById('search')?.scrollIntoView({behavior:'smooth'})}>开始查询 <Search/></button></div><div className="hero-art"><Globe2 size={100}/><b>YOUR DIGITAL HOME</b><span>domain.hub</span></div></section><section className="panel" id="search"><div className="section-head"><div><h2>域名搜索</h2><p>选择后缀并筛选演示库存。</p></div><small>MOCK 数据</small></div><div className="searchbar"><Search/><input value={q} onChange={e=>Q(e.target.value)} placeholder="输入域名前缀"/><label><select value={s} onChange={e=>S(e.target.value)}>{suffixes.map(x=><option>{x}</option>)}</select><ChevronDown/></label></div><div className="chips">{suffixes.map(x=><button className={s===x?'selected':''} onClick={()=>S(x)}>{x==='全部后缀'?'全部':x}</button>)}</div><div className="results-head">搜索结果 <span>{list.length} 个域名</span></div>{list.map(d=><article className="domain-row"><Globe2/><div><b>{d.fqdn}</b><small>演示库存 · 本地 Mock</small></div><span className="available">可领取</span><button className="claim" onClick={()=>M({type:'claim',domain:d.fqdn})}>领取</button></article>)}{!list.length&&<p className="empty">没有匹配域名。</p>}<p className="hint">仅为本地演示数据，不代表真实注册状态；不会发送后端请求。</p></section><section className="quick"><button onClick={()=>T('tasks')}>🎁 任务赚配额</button><button onClick={()=>T('account')}>⚙ 管理我的域名</button><button onClick={()=>M({type:'auth',mode:'register'})}>＋ 创建账户</button></section></>}
+{tab==='tasks'&&<section className="workspace"><h1>任务中心</h1><p>完成任务，获得更多领取配额。</p><div className="quota-card">当前可用配额 <b>{quota}</b></div>{tasks.map(t=><article className="task-row"><div><b>{t.name}</b><p>完成任务即可获得 {t.reward} 个配额。</p></div><button disabled={t.done} onClick={()=>{K(x=>x.map(y=>y.id===t.id?{...y,done:true}:y));A(x=>x+t.reward)}}>{t.done?'✓ 已完成':'完成任务'}</button></article>)}<p className="hint">任务状态仅存在当前页面内存，未接入 Telegram、GitHub 验证。</p></section>}
+{tab==='account'&&<section className="workspace"><h1>用户中心</h1><p>管理配额、域名、DNS 和邮箱。</p><div className="account-stats"><div>我的配额<b>{quota}</b></div><div>我的域名<b>{owned.length}</b></div><div>DNS 记录<b>{records.length}</b></div></div><section className="panel"><h2>我的域名</h2>{owned.length?owned.map(d=><article className="domain-row"><Globe2/><b>{d}</b><button onClick={()=>{AC(d);M({type:'dns'})}}>DNS 管理</button></article>):<p className="empty">尚未领取域名，请先去首页领取。</p>}</section><section className="panel"><div className="section-head"><h2>DNS 记录管理</h2><button onClick={()=>M({type:'dns'})}><Plus/> 添加记录</button></div>{records.map(r=><article className="dns-row"><b>{r.type}</b><span>{r.name}</span><span>{r.value}</span><button onClick={()=>R(x=>x.filter(y=>y.id!==r.id))}><Trash2/></button></article>)}</section><section className="panel"><h2>邮箱设置</h2><p>{email}</p><button onClick={()=>M({type:'msg',text:'当前演示邮箱：'+email})}>管理邮箱</button></section></section>}</main><footer>DomainHub · 前端交互演示 · Mock 数据，不连接后端</footer>
+{modal&&<div className="backdrop"><section className="dialog"><button className="close" onClick={()=>M(null)}><X/></button>{modal.type==='claim'&&<><h2>确认领取域名？</h2><b>{modal.domain}</b><p className="cost">将扣除 1 个配额</p><p>确认后仅更新当前页面演示状态。</p><button onClick={()=>M(null)}>取消</button><button className="primary" onClick={()=>{const d=modal.domain;M(null);claim(d)}}>确认领取</button></>}
+{modal.type==='auth'&&<><h2>{modal.mode==='login'?'账户登录':'创建账户'}</h2><form onSubmit={auth}><label>邮箱<input type="email" required value={email} onChange={e=>E(e.target.value)}/></label><label>密码<input type="password" required minLength={6}/></label>{modal.mode==='register'&&<label>确认密码<input type="password" required minLength={6}/></label>}<button className="primary">提交</button></form><button className="github" onClick={()=>{SI(true);M({type:'msg',text:'GitHub 登录演示完成，未发起 OAuth 请求。'})}}><Github/> 使用 GitHub 登录</button><button onClick={()=>M({type:'auth',mode:modal.mode==='login'?'register':'login'})}>{modal.mode==='login'?'立即注册':'返回登录'}</button><p className="hint">演示表单，不发送请求，不保存密码。</p></>}
+{modal.type==='dns'&&<><h2>添加 DNS 记录</h2><p>{active}</p><form onSubmit={add}><label>记录类型<select value={rt} onChange={e=>RT(e.target.value)}><option>A</option><option>CNAME</option></select></label><label>主机记录<input required value={rn} onChange={e=>RN(e.target.value)} placeholder="@ 或 www"/></label><label>记录值<input required value={rv} onChange={e=>RV(e.target.value)}/></label><button className="primary">保存记录</button></form><p className="hint">仅保存到本地 Mock 状态，不修改真实 DNS。</p></>}
+{modal.type==='msg'&&<><h2>操作提示</h2><p>{modal.text}</p><button className="primary" onClick={()=>M(null)}>知道了</button></>}</section></div>}</div>}
