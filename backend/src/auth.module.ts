@@ -4,6 +4,7 @@ import {
   UnauthorizedException, UseGuards, Logger,
 } from "@nestjs/common";
 import { randomBytes, createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { isIP } from "node:net";
 import * as argon2 from "argon2";
 import * as nodemailer from "nodemailer";
 import { PrismaService } from "./prisma.service";
@@ -16,6 +17,13 @@ const log = new Logger("Auth");
 
 function sha(value: string): Buffer { return createHash("sha256").update(value).digest(); }
 function randomToken(): string { return randomBytes(32).toString("base64url"); }
+function ipPrefix(value?: string): string | undefined {
+  if (!value) return undefined;
+  const ip = value.replace(/^::ffff:/, "");
+  if (isIP(ip) === 4) return ip.split(".").slice(0, 3).join(".") + ".0/24";
+  if (isIP(ip) === 6) return ip.split(":").slice(0, 4).join(":") + "::/56";
+  return undefined;
+}
 function normalizeEmail(value: unknown): string {
   if (typeof value !== "string") throw new BadRequestException("邮箱格式不正确");
   const email = value.trim().toLowerCase();
@@ -166,7 +174,7 @@ class AuthService {
         });
         const token = randomToken();
         await tx.emailVerificationToken.create({
-          data: { userId: created.id, tokenHash: sha(token), expiresAt: new Date(Date.now() + VERIFY_MS), requestIpPrefix: ip || undefined },
+          data: { userId: created.id, tokenHash: sha(token), expiresAt: new Date(Date.now() + VERIFY_MS), requestIpPrefix: ipPrefix(ip) },
         });
         return { ...created, verificationToken: token };
       });
@@ -230,7 +238,7 @@ class AuthService {
       const session = await tx.session.create({
         data: { userId: user.id, tokenHash: sha(raw), createdAt: now, lastSeenAt: now,
           idleExpiresAt: new Date(now.getTime() + IDLE_MS), absoluteExpiresAt: new Date(now.getTime() + ABSOLUTE_MS),
-          passwordVersion: user.credential!.passwordVersion, ipPrefix: req.ip || undefined,
+          passwordVersion: user.credential!.passwordVersion, ipPrefix: ipPrefix(req.ip),
           userAgentHash: req.headers["user-agent"] ? sha(req.headers["user-agent"]) : undefined },
       });
       await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: now } });
