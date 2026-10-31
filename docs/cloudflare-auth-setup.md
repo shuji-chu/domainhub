@@ -1,35 +1,44 @@
 # Cloudflare 认证服务配置
 
-认证运行在 `workers/api`，账户、凭据、会话、邮件令牌和 GitHub OAuth 状态保存在 Cloudflare D1（`domainhub-db`）。前端由 Cloudflare Pages 提供。
+认证后端统一运行在 Cloudflare Workers，账户、凭据、会话、邮件令牌和 GitHub OAuth 状态保存在 Cloudflare D1（`domainhub-db`）。前端由 Cloudflare Pages 提供。
 
-## 必需的 Worker Secrets
+## 邮件发送：阿里云 DirectMail
 
-在 Cloudflare Dashboard → Workers & Pages → `domainhub-api` → Settings → Variables and Secrets 中添加以下 **Secret**：
+Worker 使用阿里云 DirectMail `SingleSendMail` API（HMAC-SHA1 签名），无需把邮件密钥放进前端。
+
+需要在 `domainhub-api` Worker 的 Settings → Variables and Secrets 中设置以下 Secret：
 
 | 名称 | 用途 |
 |---|---|
-| `RESEND_API_KEY` | Resend 邮件发送 API 密钥 |
-| `RESEND_FROM_EMAIL` | 已在 Resend 验证的发件人，例如 `DomainHub <no-reply@your-verified-domain>` |
-| `GITHUB_CLIENT_ID` | GitHub OAuth App Client ID |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth App Client Secret |
-| `OAUTH_STATE_ENCRYPTION_KEY` | 加密暂存 PKCE verifier 的 32 字节密钥，Base64 编码 |
+| `ALI_ACCESS_KEY_ID` | 阿里云 RAM AccessKey ID |
+| `ALI_ACCESS_KEY_SECRET` | 阿里云 RAM AccessKey Secret |
+| `ALI_DM_ACCOUNT` | DirectMail 控制台已验证的发件地址 |
+| `ALI_DM_REGION` | 发件地址所在区域，默认 `cn-hangzhou` |
 
-可在本地生成 OAuth 加密密钥：`openssl rand -base64 32`。只把生成结果保存为 Worker Secret，不提交到 Git。
+这些变量此前已存在于 Cloudflare Pages 项目 `lynli` 的生产环境。请将其安全迁移到 Worker Secret，不要提交到 Git 或放入 `VITE_` 前端变量。发件地址必须已在同一区域的 DirectMail 控制台验证。
 
-`RESEND_FROM_EMAIL` 必须是 Resend 已验证的发件地址。若没有 Resend 账户或已验证发件域名，注册验证和密码重置邮件不会送达；Worker 会返回邮件服务未配置，而不会假装发送成功。
+## GitHub OAuth
 
-## GitHub OAuth App
+DomainHub 复用了现有 `lynli` Pages 项目中已配置的 GitHub OAuth App 凭据，已安全写入 `domainhub-api` Worker Secrets：
 
-创建 GitHub OAuth App，设置：
-- Homepage URL：`https://dns.lynli.me`
-- Authorization callback URL：`https://domainhub-api.chulingli1988.workers.dev/auth/github/callback`
+- `GITHUB_CLIENT_ID`
+- `GITHUB_CLIENT_SECRET`
+- `OAUTH_STATE_ENCRYPTION_KEY`（独立生成的 32 字节 Base64URL 密钥）
 
-权限使用 OAuth App 的用户授权流程，代码只请求 `read:user user:email`。不要把 Client Secret 放进前端、Pages 环境变量或仓库。
+GitHub OAuth App 已登记的回调地址为：
 
-## 已写入 Wrangler 的公开配置
+`https://lynli.me/api/github-oauth/callback`
+
+Cloudflare Worker Route 已绑定：
+
+`lynli.me/api/github-oauth/* → domainhub-api`
+
+登录从同一主机的 `/api/github-oauth/start` 发起，使 HttpOnly、Secure、SameSite=Lax 的浏览器绑定 Cookie 能随回调返回。授权流程使用 state、一次性状态记录、PKCE S256 和服务端会话。
+
+## 公开配置
 
 - `APP_ORIGIN=https://dns.lynli.me`
-- `GITHUB_CALLBACK_URL=https://domainhub-api.chulingli1988.workers.dev/auth/github/callback`
+- `GITHUB_CALLBACK_URL=https://lynli.me/api/github-oauth/callback`
 
 ## 认证接口
 
@@ -39,24 +48,17 @@
 - `POST /auth/login`：仅允许已验证邮箱登录。
 - `POST /auth/password/forgot`：统一响应，发送 20 分钟密码重置链接。
 - `POST /auth/password/reset`：一次性重置密码并撤销旧会话。
-- `GET /auth/github/start`：启动 GitHub OAuth，使用 state、浏览器绑定 Cookie 和 PKCE S256。
-- `GET /auth/github/callback`：验证回调、创建或查找 GitHub 身份。
+- `GET /api/github-oauth/start`：启动 GitHub OAuth。
+- `GET /api/github-oauth/callback`：处理 GitHub OAuth 回调。
 - `POST /auth/github/exchange`：兑换 60 秒有效的一次性前端登录码。
 
 GitHub 身份以 `(provider, provider_user_id)` 作为主键。未经用户主动关联，不会因为邮箱相同而自动合并已有邮箱账户。
 
-## 发布
-
-在安装 Wrangler 并登录 Cloudflare 的环境中运行：
+## 发布与迁移
 
 ```sh
 npx wrangler deploy --config workers/api/wrangler.toml
-```
-
-首次或新增 D1 migration 后运行：
-
-```sh
 npx wrangler d1 migrations apply domainhub-db --remote --config workers/api/wrangler.toml
 ```
 
-本次新增 migration：`0003_github_login_codes.sql`。生产 D1 已应用该表结构。
+本次新增迁移：`0003_github_login_codes.sql`。生产 D1 已应用该迁移。
