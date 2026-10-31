@@ -5,8 +5,15 @@ on:
     paths:
       - 'workers/api/**'
       - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: Type DEPLOY to confirm a manual production deployment
+        required: true
+        type: string
 jobs:
   deploy:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.confirm_deploy == 'DEPLOY' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -14,6 +21,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Validate required production secrets
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          DNSHE_API_TOKEN: ${{ secrets.DNSHE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID DIGITALOCEAN_TOKEN DNSHE_API_TOKEN; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required GitHub Actions secret: $name"
+              exit 1
+            fi
+          done
       - run: npm install --global wrangler
       - name: Apply pending D1 migrations
         working-directory: workers/api
@@ -30,8 +52,9 @@ jobs:
           DNSHE_API_TOKEN: ${{ secrets.DNSHE_API_TOKEN }}
         shell: bash
         run: |
-          if [ -n "$DIGITALOCEAN_TOKEN" ]; then printf '%s' "$DIGITALOCEAN_TOKEN" | wrangler secret put DIGITALOCEAN_TOKEN; fi
-          if [ -n "$DNSHE_API_TOKEN" ]; then printf '%s' "$DNSHE_API_TOKEN" | wrangler secret put DNSHE_API_TOKEN; fi
+          set -euo pipefail
+          printf '%s' "$DIGITALOCEAN_TOKEN" | wrangler secret put DIGITALOCEAN_TOKEN
+          printf '%s' "$DNSHE_API_TOKEN" | wrangler secret put DNSHE_API_TOKEN
       - name: Deploy Worker
         working-directory: workers/api
         env:
