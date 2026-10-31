@@ -1,10 +1,7 @@
-name: Build and test
+name: Pull request checks
 on:
-  push:
-    branches: [main, "feat/auth-core"]
   pull_request:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
