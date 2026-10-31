@@ -6,3 +6,8 @@ compatibility_date = "2026-11-01"
 binding = "DB"
 database_name = "domainhub-db"
 database_id = "bce5b9ed-f4d0-4351-83a3-b1e7342741f0"
+migrations_dir = "migrations"
+
+[vars]
+APP_ORIGIN = "https://dns.lynli.me"
+GITHUB_CALLBACK_URL = "https://domainhub-api.chulingli1988.workers.dev/auth/github/callback"
