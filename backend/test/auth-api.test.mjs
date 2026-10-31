@@ -46,7 +46,7 @@ test("registration, one-time email verification, quota, login cookie, csrf and l
   assert.equal(replay.status, 400);
 
   const login = await fetch(base + "/auth/login", {
-    method: "POST", headers: { "content-type": "application/json" },
+    method: "POST", headers: { "content-type": "application/json", origin: process.env.PUBLIC_APP_URL },
     body: JSON.stringify({ email: "auth-e2e@example.test", password: "StrongPass1234" }),
   });
   assert.equal(login.status, 201);
