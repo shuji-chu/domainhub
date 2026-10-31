@@ -10,8 +10,8 @@ import * as nodemailer from "nodemailer";
 import { PrismaService } from "./prisma.service";
 
 const COOKIE = process.env.SESSION_COOKIE_NAME || "__Host-domainhub_session";
-const IDLE_MS = 30 * 60 * 1000;
-const ABSOLUTE_MS = 7 * 24 * 60 * 60 * 1000;
+const IDLE_MS = Number(process.env.SESSION_IDLE_TIMEOUT_SECONDS || 1800) * 1000;
+const ABSOLUTE_MS = Number(process.env.SESSION_ABSOLUTE_TIMEOUT_SECONDS || 604800) * 1000;
 const VERIFY_MS = 30 * 60 * 1000;
 const log = new Logger("Auth");
 
@@ -42,7 +42,7 @@ function cookieValue(header: string | undefined, name: string): string | undefin
   }
   return undefined;
 }
-function safeEqual(a: string, b: string): boolean {
+function sameOrigin(candidate: string, allowed: string): boolean {\n  try { return new URL(candidate).origin === new URL(allowed).origin; } catch { return false; }\n}\nfunction safeEqual(a: string, b: string): boolean {
   const aa = Buffer.from(a); const bb = Buffer.from(b);
   return aa.length === bb.length && timingSafeEqual(aa, bb);
 }
