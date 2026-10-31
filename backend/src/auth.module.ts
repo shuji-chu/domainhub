@@ -21,11 +21,11 @@ function randomToken(): string { return randomBytes(32).toString("base64url"); }
 function ipPrefix(value?: string): string | undefined {
   if (!value) return undefined;
   const ip = value.trim().replace(/^::ffff:/i, "");
-  if (isIP(ip) === 4) return ip.split(".").slice(0, 3).join(".") + ".0/24";
+  if (isIP(ip) === 4) return ip.split(".").slice(0, 3).join(".") + ".0";
   if (isIP(ip) !== 6) return undefined;
 
   // Expand IPv6 before masking. Splitting a compressed address directly can
-  // produce invalid values such as "::1::/56", rejected by PostgreSQL INET.
+  // produce invalid values. Prisma expects a bare IP for @db.Inet (not CIDR notation),\n  // so persist the masked network address without the /24 or /56 suffix.
   const halves = ip.split("::");
   const expand = (part: string): string[] => part ? part.split(":") : [];
   const left = expand(halves[0]);
@@ -33,7 +33,7 @@ function ipPrefix(value?: string): string | undefined {
   const groups = [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill("0"), ...right];
   if (groups.length !== 8 || groups.some(group => !/^[0-9a-f]{1,4}$/i.test(group))) return undefined;
   const firstSevenBytes = (Number.parseInt(groups[3], 16) & 0xff00).toString(16);
-  return `${Number.parseInt(groups[0], 16).toString(16)}:${Number.parseInt(groups[1], 16).toString(16)}:${Number.parseInt(groups[2], 16).toString(16)}:${firstSevenBytes}::/56`;
+  return `${Number.parseInt(groups[0], 16).toString(16)}:${Number.parseInt(groups[1], 16).toString(16)}:${Number.parseInt(groups[2], 16).toString(16)}:${firstSevenBytes}::`;
 }
 function normalizeEmail(value: unknown): string {
   if (typeof value !== "string") throw new BadRequestException("邮箱格式不正确");
