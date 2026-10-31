@@ -469,3 +469,56 @@ Redis 故障时，注册、登录、验证邮件、密码重置等敏感入口 f
 - 会话恢复：有效密码重置在同一事务内消费 token、更新密码版本、撤销全部 sessions、写审计；失败整体回滚。
 - 登录优先级：重置成功不受原有 5 个活跃会话阻挡；随后新密码登录从 0 个活跃会话计数；普通第 6 个登录仍拒绝。
 - 归档：R2 Bucket Locks 配置、独立签名、只读验证身份、外部告警及恢复演练均有明确验收证据；不得将其标注为 S3 Compliance mode 等价物。
+
+
+## 19. 已封存分片的迟到事件（最终决策：A）
+
+**选择 A：迟到事件不进入原分片，写入独立补偿分片/补偿链。** 不采用重算原分片及其后续所有 manifest 的方案。
+
+理由：已封存分片的 manifest、签名检查点和外部归档代表某一时点已验证的审计事实。重算会改变历史哈希、签名与后续锚接，扩大故障半径，并要求重新签署及重新归档所有后续分片；也会削弱“封存后不可变”的审计承诺。补偿链能保留迟到事实，同时不改变既有归档。
+
+### 19.1 迟到事件处理规则
+
+- 已封存的 primary 分片永久只读，禁止 INSERT、UPDATE、DELETE、重开、重算或替换 manifest。
+- 迟到事件写入新的 compensation 分片/链，按补偿事件接收时间分配独立 shard_id 和 chain_id；每个补偿分片自身按 sequence_no、prev_hash、entry_hash 构成哈希链并生成独立签名 manifest。
+- 补偿事件必须保存原始事件发生时间 source_occurred_at、原目标 source_shard_id、原目标 manifest 哈希 source_manifest_hash，以及迟到原因/检测来源。不得将迟到事件伪装成原小时内正常到达的事件。
+- 补偿分片 manifest 锚接到当前已封存的主链检查点，并包含被补偿分片 manifest 哈希；如果同一来源分片有多批迟到事件，每批补偿 manifest 还要引用前一批补偿 manifest，形成可验证的补偿序列。
+- 校验器分别校验 primary 链、compensation 链，并验证每条补偿记录引用的 source_shard_id 与 source_manifest_hash 确实存在且签名有效。原分片哈希不匹配、引用不存在或重复补偿编号均告警；补偿事件不得反向修改原分片或原 manifest。
+- 迟到事件的展示/查询按原始发生时间归类，同时显式标注“迟到补偿记录”及实际接收/补偿时间，避免时间线误导。
+
+### 19.2 最终 audit_logs 字段
+
+以下是逻辑字段定稿；数据库类型与索引以 Prisma schema 和首个 migration 为准。
+
+| 字段 | 类型 | 约束与用途 |
+|---|---|---|
+| id | UUID | PK |
+| shard_id | UUID | NOT NULL，FK audit_shards(id)，分片归属 |
+| shard_kind | enum | NOT NULL：primary / compensation，冗余类型用于约束校验 |
+| chain_id | UUID | NOT NULL，当前分片独立链标识 |
+| sequence_no | BIGINT | NOT NULL，同一 chain_id 内唯一 |
+| occurred_at | timestamptz | NOT NULL，服务端接收/入链时间 |
+| source_occurred_at | timestamptz | NULL；补偿事件的原始发生时间 |
+| source_shard_id | UUID | NULL，补偿事件原本应归属的分片 |
+| source_manifest_hash | BYTEA | NULL，原分片已签名 manifest 哈希 |
+| prev_hash | BYTEA | NOT NULL，当前分片上一事件哈希；首条使用 genesis anchor |
+| entry_hash | BYTEA | NOT NULL，当前事件哈希 |
+| manifest_anchor_hash | BYTEA | NOT NULL，当前分片 genesis 所引用的前序 manifest 摘要 |
+| compensation_manifest_prev_hash | BYTEA | NULL，补偿批次链的前一补偿 manifest 摘要 |
+| actor_user_id / target_user_id | UUID | NULL，FK users(id) ON DELETE SET NULL |
+| actor_ref / actor_type | text | NOT NULL，匿名主体引用及类型 |
+| action / outcome | text | NOT NULL，事件动作与结果 |
+| request_id | text | NULL |
+| ip_prefix | inet | NULL |
+| user_agent_hash | BYTEA | NULL |
+| metadata | JSONB | NOT NULL，白名单字段；禁止秘密/令牌 |
+
+约束：UNIQUE(chain_id, sequence_no)；shard_kind='primary' 时 source_shard_id、source_manifest_hash、source_occurred_at 为空；shard_kind='compensation' 时三者必填且 source_shard_id 不得等于 shard_id；source_shard_id 引用 audit_shards(id)，删除策略为 RESTRICT；manifest_anchor_hash 必须等于 audit_shards.genesis_anchor_hash。补偿批次的 compensation_manifest_prev_hash 在首批可为空，后续必须指向同一来源分片上一批已签名补偿 manifest。
+
+### 19.3 分片与 manifest 表
+
+audit_shards 是分片/链目录，至少包含：id UUID PK、shard_key UNIQUE、chain_id UUID UNIQUE、kind（primary/compensation）、state（open/closing/sealed）、hour_started_at（primary 小时起点）、received_at（补偿分片创建时间）、source_shard_id nullable、source_manifest_hash nullable、previous_manifest_hash nullable、genesis_anchor_hash BYTEA NOT NULL、created_at、sealed_at。primary 分片按 UTC 小时唯一；compensation 分片必须引用已 sealed 的 primary 分片及其 manifest。
+
+audit_manifests 是不可变封存清单，至少包含：id UUID PK、shard_id UUID UNIQUE、manifest_hash BYTEA UNIQUE、previous_manifest_hash nullable、source_manifest_hash nullable、genesis_anchor_hash BYTEA、first_sequence_no、last_sequence_no、row_count、first_entry_hash、last_entry_hash、signature BYTEA、signature_key_id、signature_algorithm、canonicalization_version、sealed_at、created_at。sealed 后不允许更新或删除；同一 shard 只允许一个最终 manifest。补偿 manifest 的 source_manifest_hash 必须与 audit_shards.source_manifest_hash 一致。
+
+所有 manifest 哈希、签名与锚接字段均为二进制定长值；校验器必须验证分片内哈希链、分片 manifest 签名、primary 小时边界锚接及 compensation → source manifest 引用。schema 只定义持久化结构，不实现审计写入、签名、归档或校验逻辑。
