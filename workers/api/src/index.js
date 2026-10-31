@@ -1,7 +1,7 @@
-const ORIGIN="https://dns.lynli.me";
+const ALLOWED_ORIGINS=new Set(["https://dns.lynli.me","https://c86f58b3.domainhub-frontend.pages.dev","https://domainhub-frontend.pages.dev"]);
 const ADMIN_EMAIL="boss@lynli.me";
 const DNSHE_BASE="https://api005.dnshe.com/index.php?m=dns";
-const cors={"Access-Control-Allow-Origin":ORIGIN,"Access-Control-Allow-Credentials":"true","Access-Control-Allow-Headers":"Content-Type, Authorization","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Vary":"Origin"};
+const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"Content-Type, Authorization","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Vary":"Origin"};
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8",...cors}});
 const b64=v=>btoa(String.fromCharCode(...new Uint8Array(v))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const hex=v=>Array.from(new Uint8Array(v),x=>x.toString(16).padStart(2,"0")).join("");
@@ -16,7 +16,7 @@ const admin=async(req,env)=>{const u=await currentUser(req,env);return u&&u.emai
 async function dnshe(env,route,method="GET",body){if(!env.DNSHE_API_TOKEN)throw new Error("DNSHE_API_TOKEN 未配置");const [apiRoute,queryString]=route.split("?");const u=new URL(DNSHE_BASE);u.searchParams.set("api_route","/v1"+apiRoute);if(queryString)new URLSearchParams(queryString).forEach((v,k)=>u.searchParams.set(k,v));const r=await fetch(u.toString(),{method,headers:{"Authorization":"Bearer "+env.DNSHE_API_TOKEN,"Accept":"application/json","Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data?.error?.message||data?.message||"DNSHE 请求失败："+r.status);return data}
 export default {async fetch(req,env){
  if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
- if(req.headers.get("Origin")&&req.headers.get("Origin")!==ORIGIN)return json({error:"origin_not_allowed"},403);
+ if(req.headers.get("Origin")&&!ALLOWED_ORIGINS.has(req.headers.get("Origin")))return json({error:"origin_not_allowed"},403);
  const path=new URL(req.url).pathname;
  try{
   if(path==="/health"&&req.method==="GET"){const x=await env.DB.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table'").first();return json({ok:true,database:"domainhub-db",tables:x?.n||0})}
