@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, CheckCircle2, ChevronDown, CircleHelp, Cloud, Copy, Github, Globe2, Menu, Search, Server, ShieldCheck, Users, Wallet, X, Send, Plus } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ChevronDown, Cloud, Github, Globe2, Menu, Search, Server, ShieldCheck, Users, Wallet, X, Send } from 'lucide-react'
 
 const suffixes = ['全部后缀', '.com', '.net', '.org', '.xyz', '.top', '.site', '.online', '.tech']
 const sampleDomains = ['.site', '.online', '.xyz', '.top', '.tech'].map((suffix, i) => ({ name: ['mybrand', 'cloudbox', 'hello-world', 'fastnode', 'project'][i], suffix }))
