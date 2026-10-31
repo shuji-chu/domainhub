@@ -515,3 +515,198 @@ main{display:block;padding-bottom:88px}
 .auth-shell{color-scheme:light;color:#17324f;background:linear-gradient(180deg,#eaf4ff 0%,#f7fbff 46%,#fff 100%)}
 .auth-recipient{margin:0;padding:10px 12px;color:#526c87;background:#f2f7fd;border:1px solid #dce8f5;border-radius:9px;font-size:11px;line-height:1.7;overflow-wrap:anywhere}
 .auth-recipient b{color:#1b5fa9;font-weight:650}
+
+
+/* DomainHub 全站统一蓝白主题：覆盖首页、导航、域名库存、云服务器、弹窗及身份验证 */
+:root{
+  color-scheme:light;
+  color:#17324f;
+  background:#f4f8fd;
+  --ink:#17324f;
+  --muted:#61758e;
+  --line:#d8e5f2;
+  --blue:#2878e8;
+}
+html,body,#root{
+  min-height:100%;
+  color:#17324f;
+  background:#f4f8fd;
+}
+body{
+  background:linear-gradient(180deg,#eaf4ff 0%,#f5f9fe 34%,#fff 100%) fixed;
+}
+.app-shell{
+  color:#17324f;
+  background:transparent;
+}
+.app-shell:before,.ambient-layer,.ambient-canvas{
+  display:none!important;
+}
+/* 顶部导航与品牌 */
+.topbar{
+  color:#17324f;
+  background:rgba(255,255,255,.92);
+  border-bottom:1px solid #dce8f4;
+  box-shadow:0 4px 20px rgba(38,91,150,.055);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+}
+.brand{color:#17324f}
+.brand>span:last-child{color:#2878e8}
+.brand-mark{
+  color:#fff;
+  background:linear-gradient(135deg,#347df0,#42bce8);
+  box-shadow:0 5px 16px rgba(47,127,220,.2);
+}
+.main-nav button{color:#61758e}
+.main-nav button:hover,.main-nav button.active{color:#1559ad}
+.main-nav button.active{border-bottom-color:#2878e8}
+.top-actions button,.quota-pill{
+  color:#31516f;
+  background:#f4f8fd;
+  border:1px solid #d8e5f2;
+}
+.top-actions>span{color:#61758e}
+.top-actions button:hover{color:#1559ad;background:#edf6ff;border-color:#a9c9ed;box-shadow:none}
+.quota-pill{color:#1559ad}
+/* 首页横幅、库存面板、域名列表 */
+.hero{
+  color:#17324f;
+  background:linear-gradient(120deg,#e5f1ff 0%,#f4f9ff 58%,#fff 100%);
+  border:1px solid #d4e5f7;
+  box-shadow:0 12px 34px rgba(38,91,150,.07);
+}
+.hero-copy small{color:#2878d8}
+.hero-copy h1{color:#17324f}
+.hero-copy h1 em{color:#2878e8;background:none;-webkit-text-fill-color:currentColor}
+.hero-copy p{color:#61758e}
+.hero-art{
+  color:#2878d8;
+  background:linear-gradient(145deg,#f5faff,#e7f2ff);
+  border:1px solid #cfe1f5;
+  box-shadow:inset 0 0 24px rgba(70,145,220,.06),0 8px 24px rgba(38,91,150,.06);
+}
+.hero-art-icon{color:#2878d8;background:#e5f1ff;border-color:#c8def6;box-shadow:none}
+.hero-art-copy b{color:#234766}
+.hero-art-copy span,.hero-art-copy small{color:#617f9c}
+.panel{
+  color:#17324f;
+  background:rgba(255,255,255,.94);
+  border:1px solid #dce7f2;
+  box-shadow:0 10px 30px rgba(38,91,150,.06);
+  backdrop-filter:blur(16px);
+}
+.section-head h2,.panel h2{color:#17324f}
+.section-head p,.panel p{color:#61758e}
+.section-head>button,.claim,.task-row button,.workspace section button{
+  color:#31516f;
+  background:#f3f8fe;
+  border:1px solid #d4e2f0;
+}
+.section-head>button:hover,.claim:hover:not(:disabled),.task-row button:hover,.workspace section button:hover{
+  color:#1559ad;background:#eaf4ff;border-color:#a9c9ed;box-shadow:none;
+}
+.searchbar{
+  color:#6685a5;
+  background:#f7faff;
+  border:1px solid #d6e3f0;
+}
+.searchbar input{color:#17324f}
+.searchbar input::placeholder{color:#91a3b7}
+.searchbar:focus-within{border-color:#6da5e8;box-shadow:0 0 0 3px rgba(56,132,224,.1)}
+.results-head{color:#61758e;border-bottom-color:#e2ebf4}
+.results-head span{color:#2878d8}
+.domain-row{border-bottom-color:#e6edf5}
+.domain-row>svg{color:#3687db}
+.domain-row b{color:#23415f}
+.domain-row small{color:#71869d}
+.available{color:#176b4b;background:#eefaf4;border-color:#c9ebd9}
+.claim{color:#24577f}
+.hint,.workspace>p{color:#71869d!important}
+.form-error{color:#c43d54!important}
+.primary{
+  color:#fff;
+  background:linear-gradient(100deg,#347df0,#36b6e8);
+  border:1px solid #8fc4f4;
+  box-shadow:0 7px 20px rgba(47,127,220,.18);
+}
+.primary:hover:not(:disabled){background:linear-gradient(100deg,#286fdf,#2da9dc);box-shadow:0 8px 22px rgba(47,127,220,.22)}
+/* 云服务器、账户统计及 DNS 管理 */
+.workspace h1{color:#17324f}
+.quota-card,.account-stats>div,.task-row,.dns-row{
+  color:#31516f;
+  background:#f7faff;
+  border:1px solid #dce7f2;
+}
+.quota-card b,.account-stats b,.task-row b{color:#17324f}
+.task-row p{color:#71869d}
+.server-form label,.dialog label{color:#526c87}
+.server-form select,.dialog input,.dialog select{
+  color:#17324f;
+  background:#fff;
+  border:1px solid #d4e1ef;
+}
+.server-form select:focus,.dialog input:focus,.dialog select:focus{
+  border-color:#5b9be9;box-shadow:0 0 0 3px rgba(56,132,224,.12)
+}
+/* 登录注册与验证界面保持同一套蓝白视觉 */
+.auth-shell{
+  color-scheme:light;
+  color:#17324f;
+  background:linear-gradient(145deg,#eaf4ff 0%,#f7fbff 52%,#fff 100%);
+}
+.auth-card{
+  color:#17324f;
+  background:rgba(255,255,255,.97);
+  border:1px solid #d7e6f5;
+  box-shadow:0 18px 55px rgba(38,91,150,.12);
+  backdrop-filter:none;
+}
+.auth-card-head small{color:#2878d8}
+.auth-card-head h2{color:#102b49}
+.auth-card-head p{color:#637991}
+.auth-switch{background:#f2f7fd;border-color:#dce8f5}
+.auth-switch button{color:#61758e}
+.auth-switch button.selected{color:#1559ad;background:#e1efff;box-shadow:inset 0 0 0 1px #b7d5f8}
+.auth-form label{color:#344f6b}
+.auth-form input{color:#183653;background:#fff;border-color:#d4e1ef}
+.auth-form input::placeholder{color:#91a3b7}
+.auth-form input:focus{border-color:#5b9be9;box-shadow:0 0 0 3px rgba(56,132,224,.12)}
+.auth-link{color:#2878d8}
+.auth-link:hover{color:#1559ad;text-shadow:none}
+.auth-divider{color:#8295aa}
+.auth-divider:before,.auth-divider:after{background:#dce7f2}
+.github-auth{color:#183653;background:#f7fbff;border-color:#d3e1ef}
+.github-auth:hover{color:#1559ad;background:#edf6ff;border-color:#9fc4ef;box-shadow:0 5px 18px rgba(56,132,224,.1)}
+.auth-security,.auth-footer{color:#8093a9}
+.auth-security span{color:#3687db}
+.auth-recipient{color:#526c87;background:#f2f7fd;border-color:#dce8f5}
+.auth-recipient b{color:#1b5fa9}
+.auth-notice{color:#176b4b;background:#eefaf4;border-color:#c9ebd9}
+.auth-loading p{color:#536e8b}
+.auth-orbit{color:#2d7bd2;border-color:#b9d7f5;box-shadow:0 0 0 10px rgba(70,145,255,.06)}
+/* DNS 弹窗、提示消息与遮罩 */
+.backdrop{background:rgba(30,57,86,.22);backdrop-filter:blur(8px)}
+.dialog{
+  color:#17324f;
+  background:rgba(255,255,255,.98);
+  border:1px solid #d7e6f5;
+  box-shadow:0 20px 70px rgba(38,91,150,.2);
+}
+.dialog h2,.dialog h3{color:#17324f}
+.dialog>p,.dialog>b{color:#61758e}
+.dialog>button:not(.close){color:#2878d8}
+.close{color:#526c87;background:#f2f7fd;border-color:#dce8f5}
+.toast{
+  color:#23415f;
+  background:rgba(255,255,255,.98);
+  border:1px solid #d7e6f5;
+  box-shadow:0 12px 35px rgba(38,91,150,.16);
+}
+/* 小屏导航、表单和内容区 */
+@media(max-width:760px){
+  .main-nav{border-top-color:#e2ebf4}
+  .main-nav button{color:#61758e}
+  .main-nav button.active{color:#1559ad}
+  .panel{background:rgba(255,255,255,.96)}
+}
