@@ -47,6 +47,8 @@ model User {
   emailNormalized    String        @unique @map("email_normalized")
   emailVerifiedAt    DateTime?     @map("email_verified_at") @db.Timestamptz(6)
   status             UserStatus    @default(pending_verification)
+  // DEPRECATED: compatibility-only legacy field; never use for authorization. RBAC is authoritative.
+  role               String?       @map("role")
   displayName        String?       @map("display_name")
   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -86,6 +88,8 @@ model Session {
   tokenHash         Bytes     @unique @map("token_hash")
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   lastSeenAt        DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  // Renewal throttle marker; updated only when a renewal is actually accepted.
+  lastRenewedAt     DateTime? @map("last_renewed_at") @db.Timestamptz(6)
   idleExpiresAt     DateTime  @map("idle_expires_at") @db.Timestamptz(6)
   absoluteExpiresAt DateTime  @map("absolute_expires_at") @db.Timestamptz(6)
   revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
@@ -152,7 +156,7 @@ model OAuthAccount {
 model OAuthState {
   id                   String       @id @default(uuid()) @db.Uuid
   stateHash            Bytes        @unique @map("state_hash")
-  browserBindingHash   Bytes        @map("browser_binding_hash")
+  cookieBindingHash    Bytes        @map("cookie_binding_hash")
   purpose              OAuthPurpose
   userId               String?      @map("user_id") @db.Uuid
   sessionBindingHash   Bytes?       @map("session_binding_hash")
