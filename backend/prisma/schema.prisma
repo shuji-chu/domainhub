@@ -234,6 +234,7 @@ model AuditShard {
   sealedAt             DateTime?       @map("sealed_at") @db.Timestamptz(6)
   sourceShard          AuditShard?     @relation("CompensationSource", fields: [sourceShardId], references: [id], onDelete: Restrict)
   compensationShards   AuditShard[]    @relation("CompensationSource")
+  sourceAuditLogs      AuditLog[]      @relation("AuditCompensationSource")
   logs                 AuditLog[]
   manifest             AuditManifest?
 
