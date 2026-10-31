@@ -16,9 +16,9 @@ const admin=async(req,env)=>{const u=await currentUser(req,env);return u&&u.emai
 async function dnshe(env,route,method="GET",body){if(!env.DNSHE_API_TOKEN)throw new Error("DNSHE_API_TOKEN 未配置");const [apiRoute,queryString]=route.split("?");const u=new URL(DNSHE_BASE);u.searchParams.set("api_route","/v1"+apiRoute);if(queryString)new URLSearchParams(queryString).forEach((v,k)=>u.searchParams.set(k,v));const r=await fetch(u.toString(),{method,headers:{"Authorization":"Bearer "+env.DNSHE_API_TOKEN,"Accept":"application/json","Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data?.error?.message||data?.message||"DNSHE 请求失败："+r.status);return data}
 export default {async fetch(req,env){
  const origin=req.headers.get("Origin")||"";
- if(req.method==="OPTIONS")return new Response(null,{status:204,headers:corsFor(origin)});
- if(origin&&!ALLOWED_ORIGINS.has(origin))return respond({error:"origin_not_allowed"},403,origin);
  const respond=(data,status=200)=>json(data,status,origin);
+ if(origin&&!ALLOWED_ORIGINS.has(origin))return json({error:"origin_not_allowed"},403);
+ if(req.method==="OPTIONS")return new Response(null,{status:204,headers:corsFor(origin)});
  const path=new URL(req.url).pathname;
  try{
   if(path==="/health"&&req.method==="GET"){const x=await env.DB.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table'").first();return respond({ok:true,database:"domainhub-db",tables:x?.n||0})}
