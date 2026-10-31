@@ -210,3 +210,89 @@ VITE_ 前缀变量会进入浏览器构建产物，只能放非敏感公开配�
 ## 12. 明确不在本阶段实现
 
 不包含域名领取或库存预留、DNS 记录写入、TG 群组/机器人验证、支付/USDT、云服务器购买或开通。上述功能必须另行设计并经负责人确认后再排期。
+
+
+## 13. P0 补充决策（本节优先于前文未定案内容）
+
+本节为明确设计决策，不代表已创建数据库表、索引、Redis 实例或业务接口。
+
+### 13.1 RBAC：采用关系表
+
+采用 roles、permissions、role_permissions、user_roles 四张关系表，不再以 users.role 单字段作为最终授权来源；旧字段仅作迁移兼容。系统角色固定为 user、admin、super_admin，不允许删除。
+
+| 角色 | 权限范围 |
+|---|---|
+| user | 仅访问自己的资料、凭据、会话和 OAuth 关联 |
+| admin | 读取脱敏账号支持信息；冻结/恢复普通账号；撤销用户会话；读取脱敏审计视图 |
+| super_admin | 管理角色分配、角色权限和安全配置；执行高风险管理操作 |
+
+权限点采用 resource.action：
+- user.read_self、user.update_self、session.read_self、session.revoke_self、oauth.link_self、oauth.unlink_self；
+- admin.user.read、admin.user.suspend、admin.user.restore、admin.session.revoke、admin.audit.read；
+- rbac.role.read、rbac.role.assign、rbac.role.revoke、rbac.permission.manage；
+- security.config.read、security.config.update。
+
+admin 不得读取密码哈希、原始 session/token、OAuth secret；不得修改邮箱归属、验证状态、密码或 MFA；不得授予/撤销角色、修改权限或安全配置。普通用户资料接口必须拒绝 role/roles/permissions 字段。admin 不能自提权，也不能通过批量操作间接提权。只有受控授权服务允许写 user_roles/role_permissions；应用普通运行数据库角色不应直接拥有这些表的写权限。super_admin 的授权变更需重新认证、填写原因并审计操作者、目标、变更前后角色及 request_id；建议双人复核，至少保留两名受控 super_admin。
+
+逻辑字段：roles(id, code UNIQUE, name, is_system, created_at)；permissions(id, code UNIQUE, description)；role_permissions(role_id, permission_id, PRIMARY KEY(role_id, permission_id))；user_roles(user_id, role_id, granted_by_user_id, granted_at, revoked_at, reason)。有效 user_roles 对同一 user/role 只能一条，使用部分唯一索引或事务约束。为 user_roles(user_id, revoked_at)、role_permissions(role_id) 建索引。授权默认拒绝，所有权限由服务端检查。
+
+### 13.2 OAuth state：PostgreSQL 持久化并绑定浏览器
+
+state 使用 PostgreSQL 表作为一次性事实来源，Redis 只能作为可选缓存，不能依赖进程内存。生成至少 32 字节 CSPRNG state，数据库只存 SHA-256(state)。oauth_states 逻辑字段：id UUID PK、state_hash BYTEA UNIQUE NOT NULL、browser_binding_hash BYTEA NOT NULL、purpose（login/link）、user_id nullable FK、pkce_verifier_encrypted BYTEA、redirect_key、created_at、expires_at、consumed_at、request_ip_prefix。索引 state_hash 唯一、expires_at、(user_id, created_at)。有效期固定 10 分钟。
+
+发起前设置独立临时 Cookie __Host-domainhub_oauth_bind，至少 32 字节随机值，HttpOnly、Secure、SameSite=Lax、Path=/、不设 Domain，最长 10 分钟。数据库只存其 SHA-256 哈希。link 流程同时记录发起用户和当前 session 标识哈希。callback 必须同时匹配 state 与原浏览器 Cookie，常量时间比较；缺失、错配、过期、已消费均拒绝。数据库事务用条件更新（consumed_at IS NULL AND expires_at > now()）原子消费，只有成功更新一行才继续。link callback 还必须确认当前 session 仍有效且 user_id 与发起时一致；退出、换用户或 session 轮换后拒绝。callback URI 固定 HTTPS；redirect_key 只映射服务端白名单，不接受任意 redirect 参数。PKCE S256 必须启用。此机制防止将攻击者浏览器发起的 OAuth 回调替换到受害者浏览器。
+
+### 13.3 并发 Session 上限
+
+每账号最多 5 个活跃 session。活跃定义：revoked_at IS NULL、idle_expires_at > now()、absolute_expires_at > now()，用户 active 且 password_version 匹配。超限策略为拒绝新登录，不静默踢出最旧设备；提示用户进入会话管理页主动撤销旧 session 后重试。后续若增加踢出交互，必须由用户明确选择。
+
+创建 session 前，在同一事务对 user_id 获取事务级 advisory lock（或锁用户行），重新查询活跃数，再插入，避免并发竞态。查询示意：SELECT id, created_at, last_seen_at FROM sessions WHERE user_id=$1 AND revoked_at IS NULL AND idle_expires_at>now() AND absolute_expires_at>now() ORDER BY last_seen_at DESC。索引建议 sessions(user_id, revoked_at, idle_expires_at, absolute_expires_at) 和 sessions(user_id, last_seen_at DESC)，保留 token_hash UNIQUE。动态过期时间不得写入使用 now() 的部分索引谓词。
+
+### 13.4 Session 续期
+
+以 idle_expires_at 和 absolute_expires_at 替代原 expires_at。idle_expires_at 初始为创建时间 + 30 分钟；absolute_expires_at 初始为创建时间 + 7 天，创建后永不延长。保留 created_at、last_seen_at、revoked_at。
+
+采用节流续期：每个请求仍检查撤销、用户状态、password_version，以及 now() 同时早于两个期限；但仅当距上次续期至少 5 分钟时写数据库。更新 last_seen_at=now()，idle_expires_at=LEAST(now()+30 minutes, absolute_expires_at)。未达到 5 分钟窗口不写数据库。多实例用条件 UPDATE 保证并发安全。absolute_expires_at 到期必须重新登录，任何续期不得延长 7 天绝对期限。高风险操作仍要求重新认证。
+
+### 13.5 audit_logs 防篡改与删除保留
+
+应用运行数据库角色对 audit_logs 仅授予 INSERT，不授予 UPDATE、DELETE、TRUNCATE、ALTER、DROP 或表所有者权限；读取使用独立只读角色；迁移使用独立部署身份。分区表各分区也必须维持相同权限边界，应用角色不得绕过父表直接改分区。
+
+采用哈希链：entry_hash = SHA-256(chain_id || sequence_no || occurred_at || canonical_event || previous_hash)。通过 audit_chain_heads 单行链头在事务中加锁、分配 sequence_no、插入事件并推进链头，确保并发顺序一致。普通应用角色不能直接改链头。至少每日将链头由独立密钥管理系统签名，并将事件批次、链头、签名、行数、首尾序号及校验清单写入独立启用对象锁/WORM 的归档存储。定期重算哈希链并校验签名，任何缺口、重排、修改或归档失败均告警。哈希链本身不能抵御数据库完全控制者重写整链，因此外部签名和不可变归档不可省略。
+
+audit_logs.actor_user_id、target_user_id 外键使用 ON DELETE SET NULL，禁止级联删除。另保存不含个人信息的 actor_ref（例如用户 UUID 的不可逆 HMAC 派生标识）及 actor_type。用户软删除/匿名化后 actor_user_id 可置 NULL，但 actor_ref、事件、哈希链及归档仍保留。不得冗余存储邮箱、姓名；如依法需处理可识别 metadata，应通过隐私处理事件记录，不得静默破坏链条。按月加密归档，建议安全审计保留至少 365 天，具体按运营地法律复核。
+
+### 13.6 生产迁移流程
+
+Prisma migration 目录命名使用 UTC 时间戳 + snake_case 描述，例如 20261101123000_add_session_expiry_columns/migration.sql。每个迁移入库审查，说明可逆性、锁表风险、预计耗时、回填策略和恢复方案。
+
+生产只由受控发布 job 使用独立 migration 数据库身份执行 npx prisma migrate deploy；禁止应用启动时自动迁移，禁止生产执行 prisma migrate reset，禁止手工执行未入库 SQL。流程：CI 在临时空库执行全量迁移，并在最近生产快照副本演练升级；发布前检查数据库健康、磁盘和连接数，创建并验证迁移前快照或 pg_dump --format=custom 备份；执行 migrate deploy；成功后再滚动发布应用。采用 expand-and-contract 保持新旧版本兼容，先加字段/索引，再切换读写，最后单独清理旧结构。
+
+不承诺所有迁移均可自动 down。优先 forward fix 或回滚应用版本；破坏性数据变更无法安全逆转时，暂停写入并按审批流程从迁移前快照/PITR 恢复到隔离环境，核对数据损失窗口后决定切换。不得未经演练直接回滚已执行 DDL。保存迁移版本、操作者、发布号、日志和耗时。
+
+### 13.7 限流：生产强制 Redis
+
+多实例生产的认证限流强制依赖 Redis，使用 Lua 或等价原子操作实现 IP + 账号双维计数。PostgreSQL 原子 upsert 不作为高频认证限流的常规降级：热点行锁竞争、WAL/索引写放大和连接池压力会在高并发时拖慢认证数据库。
+
+Redis 故障时，注册、登录、验证邮件、密码重置等敏感入口 fail-closed，返回可重试的 503，不绕过限流继续处理。进程内 emergency ceiling 只能作为短时附加保护，不是跨实例安全控制。单实例开发环境可用内存计数器，生产不得使用。PostgreSQL 仅可用于低频管理计数或经容量测试的临时方案，不作为 P0 限流保障。
+
+### 13.8 provider_email 唯一性与冲突
+
+同一已验证 GitHub 邮箱不得绑定到多个本地账号。真正身份主键始终是 (provider, provider_user_id)，一个 GitHub 身份只能绑定一个本地账号。邮箱相同不得触发自动登录、合并或绑定；未验证的 GitHub 邮箱不参与匹配、不覆盖本地邮箱。
+
+设计 schema 时增加 provider_email_normalized、provider_email_verified；对 verified=true 且非空的规范化邮箱建立唯一约束/部分唯一索引。当前仅有 provider_email 的字段不足以可靠表达验证状态，实施 migration 前必须补齐。已验证邮箱冲突时拒绝绑定并进入支持流程，不得以邮箱相同绕过凭据。关联仍要求已登录用户主动发起、重新认证及 OAuth state 浏览器绑定。
+
+### 13.9 CSRF token 获取接口的 Origin 校验
+
+获取 CSRF token 的接口自身也必须校验来源：Origin 必须与配置的前端源精确匹配 scheme、host、port；不得后缀匹配、通配符或反射 Origin。Origin 缺失时检查 Referer origin；二者均缺失或不匹配的浏览器请求拒绝。Sec-Fetch-Site: cross-site 必须拒绝。响应设置 Cache-Control: no-store，CORS 只允许精确可信源。token 绑定当前 session；匿名流程使用独立短期匿名会话 Cookie，不签发通用 token。写请求仍校验 Origin/Referer、token、session 三者一致。失败审计不得包含 token/cookie。
+
+## 14. P0 补充验收清单
+
+- RBAC：三种角色权限矩阵通过测试；admin 无角色管理权限；普通资料接口无法自提权。
+- OAuth：state 绑定原浏览器、10 分钟过期、原子一次性消费；跨浏览器替换、重放及 link session 变化均失败。
+- Session：最多 5 个活跃会话；第 6 个拒绝；并发登录不超限；idle 30 分钟、每 5 分钟最多续期写一次、absolute 7 天不可延长。
+- Audit：应用角色只有 INSERT；哈希链、外部签名、WORM 归档验证通过；用户删除不级联丢失审计。
+- Migration：空库与快照升级演练通过；生产仅受控 job 执行 migrate deploy；备份可恢复；应用启动不迁移。
+- Rate limit：生产 Redis 故障时敏感入口 fail-closed。
+- OAuth email：已验证邮箱跨本地账号冲突拒绝；未验证邮箱不参与匹配。
+- CSRF：token 获取接口拒绝不可信 Origin、跨站请求和无来源浏览器请求。
