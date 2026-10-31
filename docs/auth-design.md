@@ -238,7 +238,7 @@ admin 不得读取密码哈希、原始 session/token、OAuth secret；不得修
 
 ### 13.2 OAuth state：PostgreSQL 持久化并绑定浏览器
 
-state 使用 PostgreSQL 表作为一次性事实来源，Redis 只能作为可选缓存，不能依赖进程内存。生成至少 32 字节 CSPRNG state，数据库只存 SHA-256(state)。oauth_states 逻辑字段：id UUID PK、state_hash BYTEA UNIQUE NOT NULL、browser_binding_hash BYTEA NOT NULL、purpose（login/link）、user_id nullable FK、pkce_verifier_encrypted BYTEA、redirect_key、created_at、expires_at、consumed_at、request_ip_prefix。索引 state_hash 唯一、expires_at、(user_id, created_at)。有效期固定 10 分钟。
+state 使用 PostgreSQL 表作为一次性事实来源，Redis 只能作为可选缓存，不能依赖进程内存。生成至少 32 字节 CSPRNG state，数据库只存 SHA-256(state)。oauth_states 逻辑字段：id UUID PK、state_hash BYTEA UNIQUE NOT NULL、cookie_binding_hash BYTEA NOT NULL、purpose（login/link）、user_id nullable FK、pkce_verifier_encrypted BYTEA、redirect_key、created_at、expires_at、consumed_at、request_ip_prefix。索引 state_hash 唯一、expires_at、(user_id, created_at)。有效期固定 10 分钟。
 
 发起前设置独立临时 Cookie __Host-domainhub_oauth_bind，至少 32 字节随机值，HttpOnly、Secure、SameSite=Lax、Path=/、不设 Domain，最长 10 分钟。数据库只存其 SHA-256 哈希。link 流程同时记录发起用户和当前 session 标识哈希。callback 必须同时匹配 state 与原浏览器 Cookie，常量时间比较；缺失、错配、过期、已消费均拒绝。数据库事务用条件更新（consumed_at IS NULL AND expires_at > now()）原子消费，只有成功更新一行才继续。link callback 还必须确认当前 session 仍有效且 user_id 与发起时一致；退出、换用户或 session 轮换后拒绝。callback URI 固定 HTTPS；redirect_key 只映射服务端白名单，不接受任意 redirect 参数。PKCE S256 必须启用。此机制防止将攻击者浏览器发起的 OAuth 回调替换到受害者浏览器。
 
