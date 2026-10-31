@@ -21,7 +21,6 @@ test("registration, one-time email verification, quota, login cookie, csrf and l
   await prisma.user.deleteMany({ where: { emailNormalized: "auth-e2e@example.test" } });
   await prisma.rateLimitBucket.deleteMany();
   await prisma.auditLog.deleteMany();
-  await prisma.auditChainHead.deleteMany();
   await prisma.auditManifest.deleteMany();
   await prisma.auditShard.deleteMany();
   t.after(async () => { await app.close(); });
