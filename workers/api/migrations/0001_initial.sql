@@ -37,3 +37,8 @@ CREATE TABLE IF NOT EXISTS quota_ledger(id TEXT PRIMARY KEY,user_id TEXT NOT NUL
 CREATE INDEX IF NOT EXISTS quota_ledger_user_created_idx ON quota_ledger(user_id,created_at);
 CREATE TABLE IF NOT EXISTS rate_limit_buckets(id TEXT PRIMARY KEY,dimension TEXT NOT NULL,subject_hash TEXT NOT NULL,window_start TEXT NOT NULL,count INTEGER NOT NULL DEFAULT 0,expires_at TEXT NOT NULL,UNIQUE(dimension,subject_hash,window_start));
 CREATE INDEX IF NOT EXISTS rate_limit_buckets_expiry_idx ON rate_limit_buckets(expires_at);
+CREATE TABLE IF NOT EXISTS domain_inventory(id TEXT PRIMARY KEY,zone_id TEXT NOT NULL UNIQUE,domain TEXT NOT NULL UNIQUE,status TEXT NOT NULL DEFAULT 'available' CHECK(status IN ('available','claimed','disabled')),source TEXT NOT NULL DEFAULT 'dnshe',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX IF NOT EXISTS domain_inventory_status_domain_idx ON domain_inventory(status,domain);
+CREATE TABLE IF NOT EXISTS user_domains(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,inventory_id TEXT NOT NULL UNIQUE,domain TEXT NOT NULL,dnshe_zone_id TEXT NOT NULL,claimed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','suspended','released')),FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE RESTRICT,FOREIGN KEY(inventory_id) REFERENCES domain_inventory(id) ON DELETE RESTRICT);
+CREATE INDEX IF NOT EXISTS user_domains_user_claimed_idx ON user_domains(user_id,claimed_at DESC);
+CREATE INDEX IF NOT EXISTS user_domains_zone_idx ON user_domains(dnshe_zone_id);
