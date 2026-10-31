@@ -1,10 +1,5 @@
 name: Deploy DomainHub API Worker
 on:
-  push:
-    branches: [feat/auth-core]
-    paths:
-      - 'workers/api/**'
-      - '.github/workflows/deploy-worker.yml'
   workflow_dispatch:
     inputs:
       confirm_deploy:
