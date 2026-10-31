@@ -1,7 +1,7 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { emailHtml, type EmailTemplateKind } from '../src/email/templates';
 const allowed:EmailTemplateKind[]=['verify','reset','alert'];
-export default async function handler(req:VercelRequest,res:VercelResponse){
+type Request={method?:string;body?:{to?:unknown;kind?:unknown}};type Response={status(code:number):Response;json(data:unknown):void};
+export default async function handler(req:Request,res:Response){
  if(req.method!=='POST') return res.status(405).json({error:'Method not allowed'});
  const {to,kind='verify'}=req.body??{};
  if(typeof to!=='string'||!/^\S+@\S+\.\S+$/.test(to)||!allowed.includes(kind)) return res.status(400).json({error:'Invalid recipient or template'});
