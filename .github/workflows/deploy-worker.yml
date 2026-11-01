@@ -1,5 +1,7 @@
 name: Deploy DomainHub API Worker
 on:
+  push:
+    branches: [feat/auth-core]
   workflow_dispatch:
     inputs:
       confirm_deploy:
@@ -60,7 +62,8 @@ jobs:
             value="${!name:-}"
             if [ -n "$value" ]; then
               if ! printf '%s' "$value" | wrangler secret put "$name"; then
-                echo "::warning::Unable to sync $name. Check the Cloudflare API token's Worker secret edit permission."
+                echo "::error::Unable to sync $name. Check the Cloudflare API token's Worker secret edit permission."
+                exit 1
               fi
             else
               echo "Optional secret $name is not set; corresponding integration remains disabled."
