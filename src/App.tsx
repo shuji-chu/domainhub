@@ -185,12 +185,12 @@ export default function App() {
     }
     setBusy(true); setError(""); setNotice("");
     try {
-      const result = !codeSent
-        ? await request("/auth/register", {
+      await (!codeSent
+        ? request("/auth/register", {
             email, password, displayName, termsAccepted, privacyAccepted,
             termsVersion: "1.0", privacyVersion: "1.0",
           })
-        : await request("/auth/email/verification/send", { email });
+        : request("/auth/email/verification/send", { email }));
 
       setNotice("发送成功，请去邮箱查看");
       setCodeSent(true);
