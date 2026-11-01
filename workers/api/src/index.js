@@ -85,8 +85,8 @@ const loginCode=b64(random()),expires=new Date(Date.now()+60000).toISOString();a
   if(path==="/auth/me"&&req.method==="GET"){const u=await currentUser(req,env);if(!u)return respond({error:"未登录或会话已过期"},401);return respond({ok:true,user:{id:u.id,email:u.email,displayName:u.display_name,status:u.status,quota:await quotaOf(env,u.id)}})}
   if(path==="/auth/logout"&&req.method==="POST"){const t=tokenFrom(req);if(t)await env.DB.prepare("UPDATE sessions SET revoked_at=? WHERE token_hash=?").bind(new Date().toISOString(),await hashBytes(t)).run();return respond({ok:true})}
   if(path==="/tld/quote"&&req.method==="GET"){
-   const domain=String(new URL(req.url).searchParams.get("domain")||"").trim().toLowerCase().replace(/\\.$/,"");
-   if(domain.length>253||! /^(?=.{3,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$/.test(domain))return respond({error:"请输入完整的顶级域名，例如 myname.com"},400);
+   const domain=String(new URL(req.url).searchParams.get("domain")||"").trim().toLowerCase().replace(/\.$/,"");
+   if(domain.length>253||! /^(?=.{3,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain))return respond({error:"请输入完整的顶级域名，例如 myname.com"},400);
    const tld=domain.split(".").pop(),prices={com:12.99,net:14.99,org:13.99,io:39.99,co:29.99,me:19.99,dev:16.99,app:18.99,xyz:3.99,top:4.99,info:8.99,biz:11.99,online:5.99,site:4.99,store:8.99};
    if(!Object.prototype.hasOwnProperty.call(prices,tld))return respond({error:"暂不支持该域名后缀报价"},400);
    return respond({ok:true,domain,tld,price_usdt:prices[tld],currency:"USDT",availability:"not_checked",price_source:"DomainHub 静态报价表（模拟报价）"});
@@ -94,8 +94,8 @@ const loginCode=b64(random()),expires=new Date(Date.now()+60000).toISOString();a
   if(path==="/tld/orders"&&req.method==="POST"){
    const u=await currentUser(req,env);if(!u)return respond({error:"请先登录后再购买顶级域名"},401);
    if(u.status!=="active")return respond({error:"账户已停用"},403);
-   const b=await req.json(),domain=String(b.domain||"").trim().toLowerCase().replace(/\\.$/,"");
-   if(domain.length>253||! /^(?=.{3,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$/.test(domain))return respond({error:"域名格式无效"},400);
+   const b=await req.json(),domain=String(b.domain||"").trim().toLowerCase().replace(/\.$/,"");
+   if(domain.length>253||! /^(?=.{3,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain))return respond({error:"域名格式无效"},400);
    const tld=domain.split(".").pop(),prices={com:12.99,net:14.99,org:13.99,io:39.99,co:29.99,me:19.99,dev:16.99,app:18.99,xyz:3.99,top:4.99,info:8.99,biz:11.99,online:5.99,site:4.99,store:8.99};
    if(!Object.prototype.hasOwnProperty.call(prices,tld))return respond({error:"暂不支持该域名后缀报价"},400);
    const pending=await env.DB.prepare("SELECT order_no,domain,price_usdt,status,created_at FROM tld_orders WHERE user_id=? AND domain=? AND status='pending_payment'").bind(u.id,domain).first();
