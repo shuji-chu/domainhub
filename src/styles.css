@@ -22,3 +22,5 @@
 .test-code-panel>span{color:#8de7ed;font-size:12px;font-weight:700;letter-spacing:.04em}
 .test-code-panel>strong{font:800 34px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.22em;color:#fff;text-shadow:0 0 18px rgba(66,220,236,.45);padding-left:.22em}
 .test-code-panel>p{margin:0;color:#b6cce0;font-size:11px;line-height:1.7}
+
+.test-code-copy{min-height:42px;padding:0 22px;border:0;border-radius:9px;background:linear-gradient(105deg,#56b7ff,#45d4e5);color:#041326;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(38,170,226,.22)}.test-code-copy:active{transform:scale(.98)}
