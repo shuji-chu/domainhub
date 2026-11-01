@@ -47,6 +47,58 @@ export default function App() {
   const [tldQuote, setTldQuote] = useState<TldQuote | null>(null);
   const [tldLoading, setTldLoading] = useState(false);
   const [tldOrderLoading, setTldOrderLoading] = useState(false);
+  const [page, setPage] = useState("overview");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [dnsDomainId, setDnsDomainId] = useState("");
+  const [dnsRecords, setDnsRecords] = useState<Array<Record<string, unknown>>>([]);
+  const [dnsLoading, setDnsLoading] = useState(false);
+  const [serverRows, setServerRows] = useState<Array<Record<string, unknown>>>([]);
+  const [serversLoading, setServersLoading] = useState(false);
+  const [pageError, setPageError] = useState("");
+  const menu = [
+    { id:"overview", label:"工作台总览", icon:"⌂" },
+    { id:"domains", label:"免费二级域名", icon:"◇" },
+    { id:"tld", label:"购买顶级域名", icon:"◎" },
+    { id:"mine", label:"我的域名", icon:"▤" },
+    { id:"dns", label:"DNS 管理", icon:"⌘" },
+    { id:"servers", label:"云服务器", icon:"▦" },
+    { id:"map", label:"全球资产地图", icon:"◎" },
+    { id:"rewards", label:"奖励中心", icon:"✧" },
+    { id:"orders", label:"订单记录", icon:"▧" },
+    { id:"quota", label:"余额与配额", icon:"◈" },
+    { id:"settings", label:"账户设置", icon:"⚙" },
+  ];
+  function navigate(next: string) {
+    setPage(next); setDrawerOpen(false); setPageError(""); setError(""); setNotice("");
+    if ((next === "dns" || next === "servers") && !signedIn) { switchMode("login"); return; }
+    if (next === "dns" && signedIn) void loadDns();
+    if (next === "servers" && signedIn) void loadServers();
+  }
+  async function loadDns() {
+    if (!myDomains.length) { setDnsRecords([]); setPageError("当前账户还没有可管理的 DNSHE 域名。"); return; }
+    const chosen = myDomains.find(x => x.id === dnsDomainId) || myDomains[0];
+    setDnsDomainId(chosen.id); setDnsLoading(true); setPageError("");
+    try {
+      const token=sessionStorage.getItem(TOKEN_KEY);
+      const res=await fetch(API+"/dns/records?zoneId="+encodeURIComponent(String((chosen as any).dnshe_zone_id||"")),{headers:{Authorization:"Bearer "+token}});
+      const data=await res.json();
+      if(!res.ok) throw new Error(data.error||"DNS 记录加载失败");
+      setDnsRecords(data.records||[]);
+    } catch(e) { setPageError(e instanceof Error?e.message:"DNS 记录加载失败"); }
+    finally { setDnsLoading(false); }
+  }
+  async function loadServers() {
+    setServersLoading(true); setPageError("");
+    try {
+      const token=sessionStorage.getItem(TOKEN_KEY);
+      const res=await fetch(API+"/api/servers/list",{headers:{Authorization:"Bearer "+token}});
+      const data=await res.json();
+      if(!res.ok) throw new Error(data.error||"服务器列表加载失败");
+      setServerRows(data.droplets||[]);
+    } catch(e) { setPageError(e instanceof Error?e.message:"服务器列表加载失败"); }
+    finally { setServersLoading(false); }
+  }
+
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -297,7 +349,16 @@ export default function App() {
           )}
         </div>
       </header>
-      <motion.section className="home-content" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
+
+      {signedIn && <button className="drawer-trigger" type="button" aria-label="打开导航菜单" aria-expanded={drawerOpen} onClick={()=>setDrawerOpen(true)}>☰ <span>菜单</span></button>}
+      {drawerOpen && <button className="drawer-backdrop" aria-label="关闭导航菜单" onClick={()=>setDrawerOpen(false)} />}
+      {signedIn && <aside className={"app-drawer"+(drawerOpen?" open":"")} aria-label="主导航">
+        <div className="drawer-head"><strong>DomainHub</strong><button type="button" aria-label="关闭菜单" onClick={()=>setDrawerOpen(false)}>✕</button></div>
+        <div className="drawer-user">{signedIn.email}<small>可用二级域名名额：{signedIn.quota}</small></div>
+        <nav>{menu.map(item=><button key={item.id} type="button" className={"drawer-item"+(page===item.id?" selected":"")} onClick={()=>navigate(item.id)}><b aria-hidden="true">{item.icon}</b><span>{item.label}</span><i>›</i></button>)}</nav>
+        <button className="drawer-logout" type="button" onClick={logout}>退出登录</button>
+      </aside>}
+      {(!signedIn || page==="domains" || page==="tld") ?       <motion.section className="home-content" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
         <div className="home-heading">
           <div className="eyebrow"><span /> 域名资源中心</div>
           <h1>寻找合适的域名。<br /><span>从这里开始。</span></h1>
@@ -360,6 +421,24 @@ export default function App() {
           </div>
         )}
       </motion.section>
+      : <motion.section className="home-content workspace-content" initial={{opacity:0,y:12}} animate={{opacity:1,y:0}}>
+          <div className="workspace-page-head"><div className="eyebrow"><span/> DOMAINHUB WORKSPACE</div><h1>{menu.find(x=>x.id===page)?.label}</h1><p>通过真实账户数据与已连接的服务管理你的资产。</p></div>
+          {pageError && <div className="feedback feedback-error" role="alert">{pageError}</div>}
+          {page==="overview" && <><div className="overview-grid">
+            <button onClick={()=>navigate("mine")}><span>我的域名</span><strong>{myDomains.length}</strong><small>查看已领取域名</small></button>
+            <button onClick={()=>navigate("quota")}><span>可用配额</span><strong>{signedIn?.quota??0}</strong><small>查看名额来源</small></button>
+            <button onClick={()=>navigate("servers")}><span>云服务器</span><strong>查看</strong><small>读取 DigitalOcean 账户资源</small></button>
+          </div><section className="workspace-card"><h2>快捷入口</h2><div className="workspace-shortcuts"><button onClick={()=>navigate("domains")}>领取免费二级域名 →</button><button onClick={()=>navigate("tld")}>查询顶级域名 →</button><button onClick={()=>navigate("dns")}>管理 DNS 记录 →</button></div></section></>}
+          {page==="mine" && <section className="workspace-card"><h2>我的域名 <small>{myDomains.length} 个</small></h2>{myDomains.length?myDomains.map(d=><div className="asset-row" key={d.id}><strong>{d.domain}</strong><span>{d.status||"active"}</span><button onClick={()=>{setDnsDomainId(d.id);navigate("dns");}}>管理 DNS</button></div>):<p>账户尚未领取域名。前往免费二级域名页面领取。</p>}</section>}
+          {page==="dns" && <section className="workspace-card"><h2>DNS 记录管理</h2><div className="workspace-toolbar"><select aria-label="选择域名" value={dnsDomainId} onChange={e=>{setDnsDomainId(e.target.value);}}>{myDomains.map(d=><option key={d.id} value={d.id}>{d.domain}</option>)}</select><button onClick={()=>void loadDns()} disabled={dnsLoading||!myDomains.length}>{dnsLoading?"加载中…":"刷新记录"}</button></div>{dnsLoading?<p>正在读取 DNSHE 记录…</p>:dnsRecords.length?<div className="dns-table"><div className="dns-row dns-head"><b>类型</b><b>名称</b><b>内容</b><b>TTL</b></div>{dnsRecords.map((r,i)=><div className="dns-row" key={String(r.id||i)}><span>{String(r.type||"—")}</span><span>{String(r.name||"—")}</span><span>{String(r.content||r.value||"—")}</span><span>{String(r.ttl||"自动")}</span></div>)}</div>:<p>没有读取到 DNS 记录，或当前域名暂无记录。</p>}<p className="reward-note">当前页面读取 DNSHE 实时记录；新增、修改和删除操作将在对应接口与权限校验完整后开放。</p></section>}
+          {page==="servers" && <section className="workspace-card"><h2>DigitalOcean 云服务器</h2><div className="workspace-toolbar"><span>仅显示当前账户关联的真实 Droplet</span><button onClick={()=>void loadServers()} disabled={serversLoading}>{serversLoading?"同步中…":"刷新列表"}</button></div>{serversLoading?<p>正在读取 DigitalOcean…</p>:serverRows.length?serverRows.map((d,i)=><div className="asset-row" key={String(d.id||i)}><div><strong>{String(d.name||"Droplet")}</strong><small>{String(d.region||"")} · {String(d.size||"")}</small></div><span>{String(d.status||"unknown")}</span><code>{String(d.ip||"尚无公网 IP")}</code></div>):<p>当前账户暂无关联的云服务器。服务器创建目前受后端管理员权限和计费配置限制。</p>}</section>}
+          {page==="quota" && <section className="workspace-card"><h2>域名配额</h2><div className="quota-large">{signedIn?.quota??0}</div><p>当前可用二级域名领取名额。注册赠送与活动奖励以服务端配额账本为准。</p><button onClick={()=>navigate("rewards")}>查看奖励规则</button></section>}
+          {page==="map" && <section className="workspace-card"><h2>全球资产地图</h2><div className="map-notice"><strong>地图数据准备中</strong><p>地图将只标记已关联的真实服务器区域与域名资产。当前服务器区域接口尚未接入地图数据源，因此不会显示虚构坐标。</p><button onClick={()=>navigate("servers")}>查看真实服务器资源</button></div></section>}
+          {page==="rewards" && <section className="workspace-card"><h2>新用户奖励规则</h2><div className="reward-row"><div><strong>完成注册</strong><span>新账户注册成功赠送 1 个二级域名名额</span></div><b>+1 名额</b></div><div className="reward-row"><div><strong>GitHub Star</strong><span>关注项目并为 shuji-chu/domainhub 点 Star，待服务端核验后发放</span></div><a href="https://github.com/shuji-chu/domainhub" target="_blank" rel="noreferrer">打开 GitHub</a></div><div className="reward-row"><div><strong>Telegram 社群与机器人</strong><span>加入官方群并启动 @DNSlynlimeBOT 后核验发放；机器人部署完成后启用</span></div><b>+1 名额</b></div><p className="reward-note">奖励状态与领取接口尚未接入，此处仅展示已确定的规则，不会提前增加配额。</p></section>}
+          {page==="orders" && <section className="workspace-card"><h2>订单记录</h2><p>当前 Worker 已提供顶级域名下单接口，但尚未提供用户订单查询接口。为避免展示不完整或伪造的订单，订单列表暂不显示。</p><button onClick={()=>navigate("tld")}>前往域名查询与下单</button></section>}
+          {page==="settings" && <section className="workspace-card"><h2>账户信息</h2><div className="asset-row"><strong>登录邮箱</strong><span>{signedIn?.email}</span></div><div className="asset-row"><strong>当前配额</strong><span>{signedIn?.quota??0}</span></div><p>账户安全设置与密码修改接口尚未开放。</p><button className="drawer-logout" onClick={logout}>退出登录</button></section>}
+        </motion.section>}
+
       <footer className="site-footer"><span>© {new Date().getFullYear()} DomainHub</span><span>安全 · 简洁 · 自主掌控</span></footer>
       {authOpen && !signedIn && (
         <div className="auth-overlay" role="dialog" aria-modal="true" aria-labelledby="auth-title">
