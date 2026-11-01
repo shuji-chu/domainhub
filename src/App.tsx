@@ -8,7 +8,8 @@ import "./styles.css";
 const API = "https://domainhub-api.chulingli1988.workers.dev";
 const TOKEN_KEY = "domainhub_token";
 type Mode = "login" | "register" | "verify";
-type ApiResult = { ok?: boolean; message?: string; error?: string; token?: string; quota?: number; user?: { id: string; email: string; displayName?: string | null; quota?: number }; domains?: Array<{id:string;domain:string;status?:string}> };
+type ApiResult = { ok?: boolean; message?: string; error?: string; token?: string; quota?: number; price_usdt?: number; order?: { order_no:string; domain:string; price_usdt:number; currency:string; status:string }; user?: { id: string; email: string; displayName?: string | null; quota?: number }; domains?: Array<{id:string;domain:string;status?:string}> };
+type TldQuote = { domain:string; tld:string; price_usdt:number; currency:string; availability:string; price_source:string };
 
 async function request(path: string, body: Record<string, unknown>): Promise<ApiResult> {
   const response = await fetch(API + path, {
@@ -41,6 +42,11 @@ export default function App() {
   const [domainQuery, setDomainQuery] = useState("");
   const [domainsLoading, setDomainsLoading] = useState(false);
   const [claiming, setClaiming] = useState("");
+  const [activeTab, setActiveTab] = useState<"subdomains" | "tld">("subdomains");
+  const [tldInput, setTldInput] = useState("");
+  const [tldQuote, setTldQuote] = useState<TldQuote | null>(null);
+  const [tldLoading, setTldLoading] = useState(false);
+  const [tldOrderLoading, setTldOrderLoading] = useState(false);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -129,6 +135,31 @@ export default function App() {
   };
 
   const filteredDomains = domains.filter(x => x.domain.toLowerCase().includes(domainQuery.trim().toLowerCase()));
+
+  async function searchTld() {
+    setTldLoading(true); setError(""); setNotice(""); setTldQuote(null);
+    try {
+      const response = await fetch(API + "/tld/quote?domain=" + encodeURIComponent(tldInput.trim()));
+      const result = await response.json() as TldQuote & { error?: string };
+      if (!response.ok) throw new Error(result.error || "查询顶级域名报价失败");
+      setTldQuote(result);
+    } catch (err) { setError(err instanceof Error ? err.message : "查询失败，请重试"); }
+    finally { setTldLoading(false); }
+  }
+
+  async function buyTld() {
+    if (!tldQuote) return;
+    if (!signedIn) { switchMode("login"); return; }
+    setTldOrderLoading(true); setError(""); setNotice("");
+    try {
+      const token = sessionStorage.getItem(TOKEN_KEY);
+      const response = await fetch(API + "/tld/orders", { method:"POST", headers:{ "Content-Type":"application/json", Authorization:"Bearer " + token }, body:JSON.stringify({domain:tldQuote.domain}) });
+      const result = await response.json() as ApiResult;
+      if (!response.ok || !result.order) throw new Error(result.error || "订单创建失败");
+      setNotice("订单已创建，请使用 USDT 支付。订单号：" + result.order.order_no + "，金额：" + result.order.price_usdt.toFixed(2) + " USDT。当前尚未接入支付，订单保持待支付状态。");
+    } catch (err) { setError(err instanceof Error ? err.message : "订单创建失败"); }
+    finally { setTldOrderLoading(false); }
+  }
 
   const startGithub = () => {
     // OAuth 登录只从登录入口发起；不在未勾选协议时预先传递同意版本。
@@ -267,35 +298,60 @@ export default function App() {
           <h1>寻找合适的域名。<br /><span>从这里开始。</span></h1>
           <p>查找可用域名，登录后即可领取与管理。</p>
         </div>
-        <label className="domain-search home-search">
-          <span>⌕</span>
-          <input value={domainQuery} onChange={e => setDomainQuery(e.target.value)} placeholder="输入关键词搜索域名…" aria-label="搜索域名" />
-        </label>
+                <div className="domain-tabs" role="tablist" aria-label="域名类型">
+          <button type="button" role="tab" aria-selected={activeTab === "subdomains"} className={activeTab === "subdomains" ? "active" : ""} onClick={() => setActiveTab("subdomains")}>二级域名库存</button>
+          <button type="button" role="tab" aria-selected={activeTab === "tld"} className={activeTab === "tld" ? "active" : ""} onClick={() => setActiveTab("tld")}>顶级域名搜索</button>
+        </div>
         {error && !authOpen && <div className="feedback feedback-error home-feedback" role="alert">{error}</div>}
         {notice && !authOpen && <div className="feedback feedback-success home-feedback" role="status">{notice}</div>}
-        <div className="domain-section-head"><h3>可领取域名</h3><span>{filteredDomains.length} 个</span></div>
-        <div className="domain-list public-domain-list">
-          {domainsLoading ? <div className="empty-domains">正在加载域名…</div> : filteredDomains.length ? filteredDomains.map(item => (
-            <div className="domain-row" key={item.id}>
-              <div className="domain-name"><span className="domain-dot" /><b>{item.domain}</b></div>
-              <button className="claim-button" disabled={!!claiming || (!!signedIn && signedIn.quota < 1)} onClick={() => signedIn ? void claimDomain(item.id) : switchMode("login")}>
-                {claiming === item.id ? "处理中…" : signedIn ? (signedIn.quota > 0 ? "领取" : "配额不足") : "登录后领取"}
-              </button>
-            </div>
-          )) : <div className="empty-domains">{domainQuery ? "没有匹配的域名" : "暂无可领取域名"}</div>}
-        </div>
-        {signedIn && (
+        {activeTab === "subdomains" ? (
           <>
-            <div className="domain-section-head mine-head"><h3>我的域名</h3><span>{myDomains.length} 个</span></div>
-            <div className="domain-list mine-list">
-              {myDomains.length ? myDomains.map(item => (
+            <label className="domain-search home-search">
+              <span>⌕</span>
+              <input value={domainQuery} onChange={e => setDomainQuery(e.target.value)} placeholder="搜索 DNSHE 实时库存…" aria-label="搜索二级域名库存" />
+            </label>
+            <div className="domain-section-head"><h3>DNSHE 可领取库存</h3><span>{filteredDomains.length} 个</span></div>
+            <div className="domain-list public-domain-list">
+              {domainsLoading ? <div className="empty-domains">正在加载域名…</div> : filteredDomains.length ? filteredDomains.map(item => (
                 <div className="domain-row" key={item.id}>
-                  <div className="domain-name"><span className="domain-dot owned" /><b>{item.domain}</b></div>
-                  <span className="domain-status">已领取</span>
+                  <div className="domain-name"><span className="domain-dot" /><b>{item.domain}</b></div>
+                  <button className="claim-button" disabled={!!claiming || (!!signedIn && signedIn.quota < 1)} onClick={() => signedIn ? void claimDomain(item.id) : switchMode("login")}>
+                    {claiming === item.id ? "处理中…" : signedIn ? (signedIn.quota > 0 ? "领取" : "配额不足") : "登录后领取"}
+                  </button>
                 </div>
-              )) : <div className="empty-domains">还没有领取域名</div>}
+              )) : <div className="empty-domains">{domainQuery ? "没有匹配的域名" : "DNSHE 暂无可领取库存"}</div>}
             </div>
+            {signedIn && (
+              <>
+                <div className="domain-section-head mine-head"><h3>我的域名</h3><span>{myDomains.length} 个</span></div>
+                <div className="domain-list mine-list">
+                  {myDomains.length ? myDomains.map(item => (
+                    <div className="domain-row" key={item.id}>
+                      <div className="domain-name"><span className="domain-dot owned" /><b>{item.domain}</b></div>
+                      <span className="domain-status">已领取</span>
+                    </div>
+                  )) : <div className="empty-domains">还没有领取域名</div>}
+                </div>
+              </>
+            )}
           </>
+        ) : (
+          <div className="tld-panel">
+            <p className="tld-intro">输入完整域名查询报价，例如 myname.com。此处为静态模拟报价，暂未连接注册商库存与实时可注册性。</p>
+            <div className="domain-search tld-search">
+              <span>⌕</span>
+              <input value={tldInput} onChange={e => setTldInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter") void searchTld(); }} placeholder="myname.com" aria-label="输入顶级域名" />
+              <button type="button" className="claim-button" disabled={tldLoading || !tldInput.trim()} onClick={() => void searchTld()}>{tldLoading ? "查询中…" : "查价"}</button>
+            </div>
+            {tldQuote && (
+              <div className="tld-quote">
+                <div><span className="tld-label">查询域名</span><strong>{tldQuote.domain}</strong></div>
+                <div><span className="tld-label">当前报价</span><strong className="tld-price">{tldQuote.price_usdt.toFixed(2)} USDT <small>/ 年</small></strong></div>
+                <p>报价来源：静态模拟价格表。注册可用性尚未向注册商核验。</p>
+                <button type="button" className="button button-primary tld-buy" disabled={tldOrderLoading} onClick={() => void buyTld()}>{tldOrderLoading ? "正在创建订单…" : signedIn ? "立即购买" : "登录后购买"}</button>
+              </div>
+            )}
+          </div>
         )}
       </motion.section>
       <footer className="site-footer"><span>© {new Date().getFullYear()} DomainHub</span><span>安全 · 简洁 · 自主掌控</span></footer>
@@ -348,7 +404,7 @@ export default function App() {
                     <label className="check-row"><input type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} disabled={codeSent} /><span>我已阅读并同意 <a href="#terms">用户服务协议</a></span></label>
                     <label className="check-row"><input type="checkbox" checked={privacyAccepted} onChange={e => setPrivacyAccepted(e.target.checked)} disabled={codeSent} /><span>我已阅读并同意 <a href="#privacy">隐私政策</a></span></label>
                   </div>
-                  <Button className="button button-primary" type="submit" disabled={busy || !termsAccepted || !privacyAccepted || !codeSent || code.length !== 6}>{busy ? "正在验证并创建…" : "创建账户"}<span>→</span></Button>
+                  <Button className="button button-primary" type="submit" disabled={busy || !termsAccepted || !privacyAccepted || !codeSent || code.length !== 6}>{busy ? "正在验证并创建…" : "创建账户"}<span>→</span></Button>\n                  <button className="button button-oauth" type="button" onClick={() => startGithub("register")} disabled={busy || !termsAccepted || !privacyAccepted}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 授权注册 / 登录</button>
                   <p className="form-foot">已有账户？ <button type="button" className="text-button" onClick={() => switchMode("login")}>返回登录</button></p>
                 </form>
               )}
