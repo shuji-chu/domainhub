@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Github } from "lucide-react";
+import { motion } from "framer-motion";
+import { Button } from "./components/ui/button";
 import "./styles.css";
 
 const API = "https://domainhub-api.chulingli1988.workers.dev";
@@ -259,7 +261,7 @@ export default function App() {
           )}
         </div>
       </header>
-      <section className="home-content">
+      <motion.section className="home-content" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
         <div className="home-heading">
           <div className="eyebrow"><span /> 域名资源中心</div>
           <h1>寻找合适的域名。<br /><span>从这里开始。</span></h1>
@@ -295,7 +297,7 @@ export default function App() {
             </div>
           </>
         )}
-      </section>
+      </motion.section>
       <footer className="site-footer"><span>© {new Date().getFullYear()} DomainHub</span><span>安全 · 简洁 · 自主掌控</span></footer>
       {authOpen && !signedIn && (
         <div className="auth-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setAuthOpen(false); }}>
@@ -320,19 +322,19 @@ export default function App() {
 
               {mode === "login" && (
                 <form onSubmit={handleLogin} className="auth-form">
-                  <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
+                  <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="请输入邮箱地址" /></label>
                   <label>登录密码<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" /></label>
-                  <button className="button button-primary" type="submit" disabled={busy}>{busy ? "正在登录…" : "登录账户"}<span>→</span></button>
-                  <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 授权登录</button>
+                  <Button className="button button-primary" type="submit" disabled={busy}>{busy ? "正在登录…" : "登录账户"}<span>→</span></Button>
+                  <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 账号授权登录</button>
                   <p className="form-foot">还没有账户？ <button type="button" className="text-button" onClick={() => switchMode("register")}>立即注册</button></p>
                 </form>
               )}
 
               {mode === "register" && (
                 <form onSubmit={handleRegister} className="auth-form">
-                  <label>显示名称 <span className="optional">选填</span><input autoComplete="nickname" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="你希望如何称呼你" maxLength={60} disabled={codeSent} /></label>
+                  <label>显示名称 <span className="optional">选填</span><input autoComplete="nickname" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="请输入显示名称" maxLength={60} disabled={codeSent} /></label>
                   <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" disabled={codeSent} /></label>
-                  <label>设置密码<input type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} placeholder="至少 12 位，最多 128 位" disabled={codeSent} /></label>
+                  <label>设置密码<input type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入 12 至 128 位密码" disabled={codeSent} /></label>
                   <div className="verification-row">
                     <label>邮箱验证码<input className="code-input" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="输入 6 位验证码" /></label>
                     <button className="button button-code" type="button" onClick={() => void handleGetCode()} disabled={busy || countdown > 0 || !email || !password || !termsAccepted || !privacyAccepted}>{busy ? "发送中…" : countdown > 0 ? `${countdown} 秒后重发` : codeSent ? "重新获取" : "获取验证码"}</button>
