@@ -9,7 +9,7 @@ const API = "https://domainhub-api.chulingli1988.workers.dev";
 const TOKEN_KEY = "domainhub_token";
 type Mode = "login" | "register" | "verify";
 type ApiResult = { ok?: boolean; message?: string; error?: string; token?: string; quota?: number; price_usdt?: number; order?: { order_no:string; domain:string; price_usdt:number; currency:string; status:string }; user?: { id: string; email: string; displayName?: string | null; quota?: number }; domains?: Array<{id:string;domain:string;status?:string}> };
-type TldQuote = { domain:string; tld:string; price_usdt:number; currency:string; availability:string; price_source:string };
+type TldQuote = { domain:string; availability:string; available:boolean; price:number|null; currency:string; priceClass:string; provider:string; period:string };
 
 async function request(path: string, body: Record<string, unknown>): Promise<ApiResult> {
   const response = await fetch(API + path, {
@@ -139,9 +139,9 @@ export default function App() {
   async function searchTld() {
     setTldLoading(true); setError(""); setNotice(""); setTldQuote(null);
     try {
-      const response = await fetch(API + "/tld/quote?domain=" + encodeURIComponent(tldInput.trim()));
+      const response = await fetch(API + "/tld/search?domain=" + encodeURIComponent(tldInput.trim()));
       const result = await response.json() as TldQuote & { error?: string };
-      if (!response.ok) throw new Error(result.error || "查询顶级域名报价失败");
+      if (!response.ok) throw new Error(result.error || "Spaceship 实时查询失败");
       setTldQuote(result);
     } catch (err) { setError(err instanceof Error ? err.message : "查询失败，请重试"); }
     finally { setTldLoading(false); }
@@ -155,15 +155,15 @@ export default function App() {
       const token = sessionStorage.getItem(TOKEN_KEY);
       const response = await fetch(API + "/tld/orders", { method:"POST", headers:{ "Content-Type":"application/json", Authorization:"Bearer " + token }, body:JSON.stringify({domain:tldQuote.domain}) });
       const result = await response.json() as ApiResult;
-      if (!response.ok || !result.order) throw new Error(result.error || "订单创建失败");
-      setNotice("订单已创建，请使用 USDT 支付。订单号：" + result.order.order_no + "，金额：" + result.order.price_usdt.toFixed(2) + " USDT。当前尚未接入支付，订单保持待支付状态。");
+      if (!response.ok || !result.ok) throw new Error(result.error || "注册商拒绝了本次注册请求");
+      setNotice("注册请求已提交给 Spaceship。订单号：" + (result.order?.order_no || "已受理") + "；当前状态：" + (result.order?.status || "处理中") + "。");
     } catch (err) { setError(err instanceof Error ? err.message : "订单创建失败"); }
     finally { setTldOrderLoading(false); }
   }
 
-  const startGithub = () => {
-    // OAuth 登录只从登录入口发起；不在未勾选协议时预先传递同意版本。
-    window.location.assign("https://lynli.me/api/github-oauth/start");
+  const startGithub = (purpose: "login" | "register" = "login") => {
+    const consent = purpose === "register" ? "?mode=register&terms=1.0&privacy=1.0" : "";
+    window.location.assign(API + "/auth/github/start" + consent);
   };
 
   const switchMode = (next: Mode) => {
@@ -346,9 +346,10 @@ export default function App() {
             {tldQuote && (
               <div className="tld-quote">
                 <div><span className="tld-label">查询域名</span><strong>{tldQuote.domain}</strong></div>
-                <div><span className="tld-label">当前报价</span><strong className="tld-price">{tldQuote.price_usdt.toFixed(2)} USDT <small>/ 年</small></strong></div>
-                <p>报价来源：静态模拟价格表。注册可用性尚未向注册商核验。</p>
-                <button type="button" className="button button-primary tld-buy" disabled={tldOrderLoading} onClick={() => void buyTld()}>{tldOrderLoading ? "正在创建订单…" : signedIn ? "立即购买" : "登录后购买"}</button>
+                <div><span className="tld-label">实时可用性</span><strong className={tldQuote.available ? "tld-available" : "tld-unavailable"}>{tldQuote.availability === "available" ? "可以注册" : tldQuote.availability === "unavailable" ? "已被注册" : tldQuote.availability}</strong></div>
+                <div><span className="tld-label">Spaceship 实时报价</span><strong className="tld-price">{tldQuote.price == null ? "暂无报价" : tldQuote.price.toFixed(2) + " " + tldQuote.currency} <small>/ 年</small></strong></div>
+                <p>数据来自 Spaceship 实时 API；域名价格可能因高级域名、促销和注册局规则变化。</p>
+                <button type="button" className="button button-primary tld-buy" disabled={tldOrderLoading || !tldQuote.available} onClick={() => void buyTld()}>{tldOrderLoading ? "正在提交注册…" : tldQuote.available ? "立即下单" : "当前不可注册"}</button>
               </div>
             )}
           </div>
