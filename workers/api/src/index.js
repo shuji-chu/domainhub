@@ -114,6 +114,8 @@ const loginCode=b64(random()),expires=new Date(Date.now()+60000).toISOString();a
    const now=new Date().toISOString(),orderNo="DH"+Date.now().toString(36).toUpperCase()+b64(random(6)).slice(0,8).toUpperCase(),orderId=crypto.randomUUID();
    await env.DB.prepare("INSERT INTO tld_orders(id,order_no,user_id,domain,provider,status,created_at,updated_at) VALUES(?,?,?,?,'spaceship','submitting',?,?)").bind(orderId,orderNo,u.id,domain,now,now).run();
    try{
+    const availability=await spaceshipRequest(env,"/domains/"+encodeURIComponent(domain)+"/available");
+    if(availability.data.result!=="available")throw Object.assign(new Error("该域名已被注册或注册商当前不可注册（"+String(availability.data.result||"unknown")+"）"),{status:409,providerStatus:409,providerData:availability.data});
     const result=await spaceshipRequest(env,"/domains/"+encodeURIComponent(domain),"POST",{autoRenew:false,years:1,privacyProtection:{level:"high",userConsent:true},contacts:contactIds});
     const operationId=result.headers.get("spaceship-async-operationid")||null,status=result.status===202?"registrar_pending":"submitted";
     await env.DB.prepare("UPDATE tld_orders SET status=?,provider_operation_id=?,provider_response=?,updated_at=? WHERE id=?").bind(status,operationId,JSON.stringify(result.data).slice(0,8000),new Date().toISOString(),orderId).run();
