@@ -4,7 +4,7 @@ type Server={id:number;name:string;status:string;region?:string;size?:string;ip:
 type UsageEvent={id:string;droplet_id:number;action:string;status:string;details?:string|null;created_at:string};
 type UsageServer={id:number;name:string;status:string;created_at:string;monthly_price:number;hourly_estimate:number;elapsed_hours:number;estimated_cost:number;currency:string};
 function ServersPage({api}:{api:(path:string,init?:RequestInit)=>Promise<any>}){
- const[servers,setServers]=useState<Server[]>([]),[region,setRegion]=useState('nyc3'),[size,setSize]=useState('s-1vcpu-1gb'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[confirming,setConfirming]=useState(false),[pending,setPending]=useState<{id:number;action:string;name:string}|null>(null),[usage,setUsage]=useState<UsageServer[]>([]),[events,setEvents]=useState<UsageEvent[]>([]),[disclaimer,setDisclaimer]=useState(''),[selected,setSelected]=useState<number|null>(null);
+ const[servers,setServers]=useState<Server[]>([]),[region,setRegion]=useState('nyc3'),[size,setSize]=useState('s-1vcpu-1gb'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[confirming,setConfirming]=useState(false),[pending,setPending]=useState<{id:number;action:string;name:string}|null>(null),[usage,setUsage]=useState<UsageServer[]>([]),[events,setEvents]=useState<UsageEvent[]>([]),[disclaimer,setDisclaimer]=useState('');
  const load=async()=>{setBusy(true);setError('');try{const[d,u]=await Promise.all([api('/api/servers/list'),api('/api/servers/usage')]);setServers(d.droplets||[]);setUsage(u.servers||[]);setEvents(u.events||[]);setDisclaimer(u.disclaimer||'')}catch(e:any){setError(e.message||'服务器数据加载失败')}finally{setBusy(false)}};
  useEffect(()=>{void load()},[]);
  const create=async()=>{setBusy(true);setError('');try{const d=await api('/api/servers/create',{method:'POST',body:JSON.stringify({name:'dh-'+Date.now().toString(36),region,size,image:'ubuntu-24-04-x64'})});setServers(v=>[d.droplet,...v]);await load()}catch(e:any){setError(e.message)}finally{setBusy(false)}};
@@ -23,7 +23,7 @@ function ServersPage({api}:{api:(path:string,init?:RequestInit)=>Promise<any>}){
   <div className='server-list-head'><h3>我的服务器 <span>{servers.length}</span></h3><small>IP 地址和状态来自实时服务器详情</small></div>
   {servers.map(s=><article className='server-card' key={s.id}>
    <div className='server-card-top'><div><b>{s.name}</b><small>编号 {s.id} · {s.region||'—'} · {s.size||'—'}</small></div><span className={'server-status '+(s.status==='active'?'is-active':'')}>{s.status==='active'?'运行中':s.status==='off'?'已关机':s.status}</span></div>
-   <div className='server-ip-row'><span>公网 IP</span><b>{s.ip||'等待分配'}</b><button type='button' onClick={()=>{setSelected(s.id);void api('/api/servers/detail?id='+s.id).then(d=>setServers(v=>v.map(x=>x.id===s.id?{...x,...d.droplet}:x))).catch((e:any)=>setError(e.message))}}>刷新 IP / 状态</button></div>
+   <div className='server-ip-row'><span>公网 IP</span><b>{s.ip||'等待分配'}</b><button type='button' onClick={()=>{void api('/api/servers/detail?id='+s.id).then(d=>setServers(v=>v.map(x=>x.id===s.id?{...x,...d.droplet}:x))).catch((e:any)=>setError(e.message))}}>刷新 IP / 状态</button></div>
    <div className='server-actions'>
     <button disabled={busy||s.status==='active'} onClick={()=>setPending({id:s.id,action:'power_on',name:s.name})}>开机</button>
     <button disabled={busy||s.status==='off'} onClick={()=>setPending({id:s.id,action:'power_off',name:s.name})}>关机</button>
