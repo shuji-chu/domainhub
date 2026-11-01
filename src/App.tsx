@@ -2,11 +2,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Github } from "lucide-react";
 import "./styles.css";
 
-const TEST_ENV = new URLSearchParams(window.location.search).get("env") === "test";
-const API = TEST_ENV ? "https://domainhub-api-test.chulingli1988.workers.dev" : "https://domainhub-api.chulingli1988.workers.dev";
-const TOKEN_KEY = TEST_ENV ? "domainhub_test_token" : "domainhub_token";
+const API = "https://domainhub-api.chulingli1988.workers.dev";
+const TOKEN_KEY = "domainhub_token";
 type Mode = "login" | "register" | "verify";
-type ApiResult = { ok?: boolean; message?: string; error?: string; testMode?: boolean; token?: string; user?: { id: string; email: string; displayName?: string | null; quota?: number } };
+type ApiResult = { ok?: boolean; message?: string; error?: string; testMode?: boolean; verificationCode?: string; token?: string; user?: { id: string; email: string; displayName?: string | null; quota?: number } };
 
 async function request(path: string, body: Record<string, unknown>): Promise<ApiResult> {
   const response = await fetch(API + path, {
@@ -21,7 +20,7 @@ async function request(path: string, body: Record<string, unknown>): Promise<Api
 
 export default function App() {
   const [mode, setMode] = useState<Mode>("login");
-  const [email, setEmail] = useState(TEST_ENV ? "domainhub-test@example.com" : "");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [code, setCode] = useState("");
@@ -111,10 +110,12 @@ export default function App() {
     setBusy(true); setError(""); setNotice("");
     try {
       const result = await request("/auth/email/verify", { email, code });
-      setNotice(result.message || "邮箱验证成功，请登录。");
+      if (!result.token || !result.user) throw new Error("验证成功，但自动登录响应不完整，请重试");
+      sessionStorage.setItem(TOKEN_KEY, result.token);
+      setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
+      setNotice(result.message || "注册成功，已自动登录");
       setCode(""); setCodeSent(false); setCountdown(0);
       setPassword("");
-      setMode("login");
     } catch (err) {
       setError(err instanceof Error ? err.message : "验证码错误或已过期");
     } finally { setBusy(false); }
@@ -139,10 +140,11 @@ export default function App() {
         });
         setCodeSent(true);
         setNotice(result.message || "验证码已发送，请查收邮箱。");
-        if (result.testMode) window.alert("验证码已发送（测试环境请在后台查看）");
+        if (result.verificationCode) window.alert("【测试模式】您的验证码是："+result.verificationCode);
       } else {
         const result = await request("/auth/email/verification/send", { email });
         setNotice(result.message || "验证码已重新发送。");
+        if (result.verificationCode) window.alert("【测试模式】您的验证码是："+result.verificationCode);
         if (result.testMode) window.alert("验证码已发送（测试环境请在后台查看）");
       }
       setCountdown(60);
@@ -170,6 +172,7 @@ export default function App() {
     try {
       const result = await request("/auth/email/verification/send", { email });
       setNotice(result.message || "如果该邮箱对应待验证账户，我们会发送验证邮件。");
+      if (result.verificationCode) window.alert("【测试模式】您的验证码是："+result.verificationCode);
     } catch (err) {
       setError(err instanceof Error ? err.message : "发送失败");
     } finally { setBusy(false); }
@@ -195,7 +198,7 @@ export default function App() {
           <img className="brand-mark" src="/logo.svg" alt="" />
           <span>Domain<span className="brand-light">Hub</span></span>
         </a>
-        <span className="topbar-note">{TEST_ENV ? "测试环境 · 独立测试数据" : "域名与 DNS 管理平台"}</span>
+        <span className="topbar-note">{"域名与 DNS 管理平台"}</span>
       </header>
 
       <section className="auth-layout">
@@ -245,7 +248,7 @@ export default function App() {
                   <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
                   <label>登录密码<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" /></label>
                   <button className="button button-primary" type="submit" disabled={busy}>{busy ? "正在登录…" : "登录账户"}<span>→</span></button>
-                  {!TEST_ENV && <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 授权登录</button> }
+                  <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 授权登录</button>
                   <p className="form-foot">尚未拥有账户？ <button type="button" className="text-button" onClick={() => switchMode("register")}>立即注册</button></p>
                 </form>
               )}
