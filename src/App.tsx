@@ -42,7 +42,206 @@ export default function App() {
   useEffect(() => {
     if (countdown <= 0) return;
     const timer = window.setInterval(() => setCountdown(value => Math.max(0, value - 1)), 1000);
-    return (
+    return () => window.clearInterval(timer);
+  }, [countdown > 0]);
+
+  useEffect(() => {
+    const savedToken = sessionStorage.getItem(TOKEN_KEY);
+    if (savedToken) {
+      fetch(API + "/auth/me", { headers: { Authorization: `Bearer ${savedToken}` } })
+        .then(async response => {
+          const result = await response.json().catch(() => ({})) as ApiResult;
+          if (!response.ok || !result.user) throw new Error("会话已失效");
+          setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
+        })
+        .catch(() => sessionStorage.removeItem(TOKEN_KEY));
+    }
+    const params = new URLSearchParams(window.location.search);
+    const oauthCode = params.get("oauth_code");
+    const authError = params.get("auth_error");
+    if (authError) {
+      const messages: Record<string, string> = {
+        github_unconfigured: "GitHub 授权登录暂不可用，请使用邮箱密码登录。",
+        oauth_consent_required: "请先阅读并同意用户服务协议和隐私政策。",
+        github_state: "授权状态已失效，请重新发起登录。",
+        github_failed: params.get("reason") || "GitHub 授权失败，请重试。",
+      };
+      setError(messages[authError] || "授权登录未完成，请重试。");
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+    if (oauthCode) {
+      setBusy(true);
+      request("/auth/github/exchange", { code: oauthCode })
+        .then(result => {
+          if (!result.token || !result.user) throw new Error("授权登录响应不完整，请重试");
+          sessionStorage.setItem(TOKEN_KEY, result.token);
+          setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
+          setAuthOpen(false);
+          window.history.replaceState({}, "", window.location.pathname);
+        })
+        .catch(err => setError(err instanceof Error ? err.message : "GitHub 授权登录失败"))
+        .finally(() => setBusy(false));
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const token = sessionStorage.getItem(TOKEN_KEY);
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    setDomainsLoading(true);
+    const mineRequest = signedIn
+      ? fetch(API + "/domains/mine", { headers }).then(r => r.json())
+      : Promise.resolve({ ok: true, domains: [] });
+    Promise.all([
+      fetch(API + "/domains", { headers }).then(r => r.json()),
+      mineRequest,
+    ]).then(([available, mine]) => {
+      if (cancelled) return;
+      if (available?.ok) setDomains(available.domains || []);
+      else if (available?.error) setError(available.error);
+      if (mine?.ok) setMyDomains(mine.domains || []);
+      if (signedIn && available?.quota !== undefined) setSignedIn(v => v ? { ...v, quota: Number(available.quota) } : v);
+    }).catch(() => {
+      if (!cancelled) setError("域名列表暂时无法加载，请稍后重试");
+    }).finally(() => {
+      if (!cancelled) setDomainsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [signedIn?.email]);
+
+  const claimDomain = async (id:string) => {
+    setClaiming(id); setError(""); setNotice("");
+    try {
+      const token = sessionStorage.getItem(TOKEN_KEY);
+      const response = await fetch(API + "/domains/claim", {method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},body:JSON.stringify({inventoryId:id})});
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "领取域名失败");
+      setNotice("域名已成功领取");
+      setDomains(v => v.filter(x => x.id !== id));
+      setMyDomains(v => [result.domain, ...v]);
+      setSignedIn(v => v ? {...v, quota:Number(result.quota ?? Math.max(0,v.quota-1))} : v);
+    } catch(err) { setError(err instanceof Error ? err.message : "领取域名失败"); }
+    finally { setClaiming(""); }
+  };
+
+  const filteredDomains = domains.filter(x => x.domain.toLowerCase().includes(domainQuery.trim().toLowerCase()));
+
+  const startGithub = () => {
+    const query = mode === "register" ? "?mode=register&terms=1.0&privacy=1.0" : "";
+    // Start OAuth on the same lynli.me host as the registered callback so the __Host cookie is returned.
+    window.location.assign("https://lynli.me/api/github-oauth/start" + query);
+  };
+
+  const switchMode = (next: Mode) => {
+    setAuthOpen(true);
+    setMode(next);
+    setError("");
+    setNotice("");
+  };
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await request("/auth/login", { email, password });
+      if (!result.token || !result.user) throw new Error("登录响应不完整，请重试");
+      sessionStorage.setItem(TOKEN_KEY, result.token);
+      setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
+      setAuthOpen(false);
+      setPassword("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "登录失败");
+    } finally { setBusy(false); }
+  }
+
+  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!codeSent || code.length !== 6 || !termsAccepted || !privacyAccepted) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await request("/auth/email/verify", { email, code });
+      if (!result.token || !result.user) throw new Error("验证成功，但自动登录响应不完整，请重试");
+      sessionStorage.setItem(TOKEN_KEY, result.token);
+      setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
+      setAuthOpen(false);
+      setNotice(result.message || "注册成功，已自动登录");
+      setCode(""); setCodeSent(false); setCountdown(0);
+      setPassword("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "验证码错误或已过期");
+    } finally { setBusy(false); }
+  }
+
+  async function handleGetCode() {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("请先填写有效的邮箱地址。"); return;
+    }
+    if (password.length < 12 || password.length > 128) {
+      setError("密码长度必须为 12 至 128 位。"); return;
+    }
+    if (!termsAccepted || !privacyAccepted) {
+      setError("请先阅读并同意用户服务协议和隐私政策。"); return;
+    }
+    setBusy(true); setError(""); setNotice("");
+    try {
+      if (!codeSent) {
+        const result = await request("/auth/register", {
+          email, password, displayName, termsAccepted, privacyAccepted,
+          termsVersion: "1.0", privacyVersion: "1.0",
+        });
+        setCodeSent(true);
+        setNotice(result.message || "验证码已发送，请查收邮箱。");
+        if (result.verificationCode) window.alert("【测试模式】您的验证码是："+result.verificationCode);
+      } else {
+        const result = await request("/auth/email/verification/send", { email });
+        setNotice(result.message || "验证码已重新发送。");
+        if (result.verificationCode) window.alert("【测试模式】您的验证码是："+result.verificationCode);
+
+      }
+      setCountdown(60);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "验证码发送失败");
+    } finally { setBusy(false); }
+  }
+
+  async function handleVerify(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await request("/auth/email/verify", { email, code });
+      setNotice(result.message || "邮箱验证成功，请登录。");
+      setCode("");
+      setPassword("");
+      setMode("login");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "验证失败");
+    } finally { setBusy(false); }
+  }
+
+  async function resendCode() {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await request("/auth/email/verification/send", { email });
+      setNotice(result.message || "如果该邮箱对应待验证账户，我们会发送验证邮件。");
+      if (result.verificationCode) window.alert("【测试模式】您的验证码是："+result.verificationCode);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "发送失败");
+    } finally { setBusy(false); }
+  }
+
+  function logout() {
+    const token = sessionStorage.getItem(TOKEN_KEY);
+    if (token) void fetch(API + "/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    sessionStorage.removeItem(TOKEN_KEY);
+    setSignedIn(null);
+    setAuthOpen(false);
+    setEmail("");
+    setPassword("");
+    setMode("login");
+    setNotice("已安全退出登录。");
+  }
+  return (
     <main className="auth-shell home-shell">
       <div className="ambient ambient-one" />
       <div className="ambient ambient-two" />
@@ -66,26 +265,19 @@ export default function App() {
           )}
         </div>
       </header>
-
       <section className="home-content">
         <div className="home-heading">
           <div className="eyebrow"><span /> 域名资源中心</div>
           <h1>寻找合适的域名。<br /><span>从这里开始。</span></h1>
-          <p>搜索可用域名，登录后即可领取并管理。</p>
+          <p>搜索真实可用域名，登录后即可领取并管理。</p>
         </div>
-
         <label className="domain-search home-search">
           <span>⌕</span>
           <input value={domainQuery} onChange={e => setDomainQuery(e.target.value)} placeholder="输入关键词搜索域名…" aria-label="搜索域名" />
         </label>
-
-        {error && <div className="feedback feedback-error home-feedback" role="alert">{error}</div>}
-        {notice && <div className="feedback feedback-success home-feedback" role="status">{notice}</div>}
-
-        <div className="domain-section-head">
-          <h3>可领取域名</h3>
-          <span>{filteredDomains.length} 个</span>
-        </div>
+        {error && !authOpen && <div className="feedback feedback-error home-feedback" role="alert">{error}</div>}
+        {notice && !authOpen && <div className="feedback feedback-success home-feedback" role="status">{notice}</div>}
+        <div className="domain-section-head"><h3>可领取域名</h3><span>{filteredDomains.length} 个</span></div>
         <div className="domain-list public-domain-list">
           {domainsLoading ? <div className="empty-domains">正在加载域名…</div> : filteredDomains.length ? filteredDomains.map(item => (
             <div className="domain-row" key={item.id}>
@@ -96,7 +288,6 @@ export default function App() {
             </div>
           )) : <div className="empty-domains">{domainQuery ? "没有匹配的域名" : "暂无可领取域名"}</div>}
         </div>
-
         {signedIn && (
           <>
             <div className="domain-section-head mine-head"><h3>我的域名</h3><span>{myDomains.length} 个</span></div>
@@ -111,9 +302,7 @@ export default function App() {
           </>
         )}
       </section>
-
       <footer className="site-footer"><span>© {new Date().getFullYear()} DomainHub</span><span>安全 · 简洁 · 自主掌控</span></footer>
-
       {authOpen && !signedIn && (
         <div className="auth-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setAuthOpen(false); }}>
           <section className="auth-card auth-modal" aria-labelledby="auth-title">
@@ -199,4 +388,5 @@ export default function App() {
       )}
     </main>
   );
+}
 }
