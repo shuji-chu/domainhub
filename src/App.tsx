@@ -119,7 +119,7 @@ export default function App() {
   }
 
   async function handleGetCode() {
-    if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setError("请先填写有效的邮箱地址。"); return;
     }
     if (password.length < 12 || password.length > 128) {
@@ -220,7 +220,8 @@ export default function App() {
           ) : (
             <>
               <div className="card-heading">
-                {mode === "register" && <div className="card-brand"><img src="/logo.svg" alt="DomainHub" /><span>Domain<span>Hub</span></span></div>}\n                <p className="card-kicker">欢迎使用 DomainHub</p>
+                {mode === "register" && <div className="card-brand"><img src="/logo.svg" alt="DomainHub" /><span>Domain<span>Hub</span></span></div>}\n                {mode === "register" && <div className="card-brand"><img src="/logo.svg" alt="DomainHub" /><span>Domain<span>Hub</span></span></div>}
+                <p className="card-kicker">欢迎使用 DomainHub</p>
                 <h2 id="auth-title">{mode === "register" ? "创建账户" : mode === "verify" ? "验证邮箱" : "欢迎回来"}</h2>
                 <p>{mode === "register" ? "填写信息，开启你的域名管理空间。" : mode === "verify" ? "输入发送到邮箱的 6 位验证码。" : "登录你的账户以继续使用 DomainHub。"}</p>
               </div>
