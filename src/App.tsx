@@ -2,9 +2,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Github } from "lucide-react";
 import "./styles.css";
 
-const API = "https://domainhub-api.chulingli1988.workers.dev";
+const TEST_ENV = new URLSearchParams(window.location.search).get("env") === "test";
+const API = TEST_ENV ? "https://domainhub-api-test.chulingli1988.workers.dev" : "https://domainhub-api.chulingli1988.workers.dev";
 type Mode = "login" | "register" | "verify";
-type ApiResult = { ok?: boolean; message?: string; error?: string; token?: string; user?: { id: string; email: string; displayName?: string | null; quota?: number } };
+type ApiResult = { ok?: boolean; message?: string; error?: string; testMode?: boolean; token?: string; user?: { id: string; email: string; displayName?: string | null; quota?: number } };
 
 async function request(path: string, body: Record<string, unknown>): Promise<ApiResult> {
   const response = await fetch(API + path, {
@@ -137,9 +138,11 @@ export default function App() {
         });
         setCodeSent(true);
         setNotice(result.message || "验证码已发送，请查收邮箱。");
+        if (result.testMode) window.alert("验证码已发送（测试环境请在后台查看）");
       } else {
         const result = await request("/auth/email/verification/send", { email });
         setNotice(result.message || "验证码已重新发送。");
+        if (result.testMode) window.alert("验证码已发送（测试环境请在后台查看）");
       }
       setCountdown(60);
     } catch (err) {
@@ -220,7 +223,7 @@ export default function App() {
           ) : (
             <>
               <div className="card-heading">
-                {mode === "register" && <div className="card-brand"><img src="/logo.svg" alt="DomainHub" /><span>Domain<span>Hub</span></span></div>}\n                {mode === "register" && <div className="card-brand"><img src="/logo.svg" alt="DomainHub" /><span>Domain<span>Hub</span></span></div>}
+                {mode === "register" && <div className="card-brand"><img src="/logo.svg" alt="DomainHub" /><span>Domain<span>Hub</span></span></div>}
                 <p className="card-kicker">欢迎使用 DomainHub</p>
                 <h2 id="auth-title">{mode === "register" ? "创建账户" : mode === "verify" ? "验证邮箱" : "欢迎回来"}</h2>
                 <p>{mode === "register" ? "填写信息，开启你的域名管理空间。" : mode === "verify" ? "输入发送到邮箱的 6 位验证码。" : "登录你的账户以继续使用 DomainHub。"}</p>
