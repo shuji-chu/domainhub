@@ -229,8 +229,15 @@ export default function App() {
     setBusy(true); setError(""); setNotice("");
     try {
       const result = await request("/auth/email/verification/send", { email });
-      setNotice(result.message || "如果该邮箱对应待验证账户，我们会发送验证邮件。");
-      if (result.verificationCode) window.alert("【测试模式】您的验证码是："+result.verificationCode);
+      if (result.testMode && !result.verificationCode) throw new Error("测试通道没有返回验证码，请稍后重试。");
+      if (result.verificationCode) {
+        setTestVerificationCode(result.verificationCode);
+        setCode(result.verificationCode);
+        setNotice("新的测试验证码已显示在页面中。");
+      } else {
+        setTestVerificationCode("");
+        setNotice(result.message || "如果该邮箱对应待验证账户，我们会发送验证邮件。");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "发送失败");
     } finally { setBusy(false); }
