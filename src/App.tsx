@@ -163,7 +163,7 @@ export default function App() {
 
   const startGithub = (purpose: "login" | "register" = "login") => {
     const consent = purpose === "register" ? "?mode=register&terms=1.0&privacy=1.0" : "";
-    window.location.assign(API + "/auth/github/start" + consent);
+    window.location.assign("https://lynli.me/api/github-oauth/start" + consent);
   };
 
   const switchMode = (next: Mode) => {
