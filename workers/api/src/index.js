@@ -104,9 +104,34 @@ const loginCode=b64(random()),expires=new Date(Date.now()+60000).toISOString();a
     const availabilityItem=(availability.data.domains||[]).find(x=>String(x.domain).toLowerCase()===domain)||availability.data.domains?.[0]||{};
     const pricingItem=(pricing.data.domains||[]).find(x=>String(x.domain).toLowerCase()===domain)||pricing.data.domains?.[0]||{};
     if(pricingItem.errorCode)throw Object.assign(new Error("Spaceship 不支持该后缀："+pricingItem.errorCode),{status:422});
-    const registerPrice=pricingItem.prices?.register?.[0]?.priceInDefaultCurrency?.finalPrice||availabilityItem.premiumPricing?.find(x=>x.operation==="register");
-    return respond({ok:true,provider:"Spaceship",domain,availability:availabilityItem.result||"unknown",available:availabilityItem.result==="available",price:registerPrice?.amount??registerPrice?.price??null,currency:registerPrice?.currency||"USD",priceClass:pricingItem.priceClass||"standard",period:"1y"});
+    const rawAvailability=String(availabilityItem.result||"unknown").toLowerCase();
+    const availabilityStatus=rawAvailability==="available"?"available":(["unavailable","taken","registered","reserved"].includes(rawAvailability)?"unavailable":"unknown");
+    const finalPrice=pricingItem.prices?.register?.[0]?.priceInDefaultCurrency?.finalPrice;
+    const premiumPrice=availabilityItem.premiumPricing?.find(x=>x.operation==="register");
+    const priceValue=finalPrice?.amount??finalPrice?.price??premiumPrice?.price??premiumPrice?.amount??null;
+    const parsedPrice=priceValue===null?null:Number(priceValue);
+    const price=Number.isFinite(parsedPrice)?parsedPrice:null;
+    const currency=finalPrice?.currency||premiumPrice?.currency||"USD";
+    return respond({ok:true,provider:"Spaceship",domain,availability:availabilityStatus,availabilityRaw:rawAvailability,available:availabilityStatus==="available",price,currency,priceClass:pricingItem.priceClass||"standard",period:"1y"});
    }catch(e){return respond({ok:false,error:e.message||"Spaceship 查询失败",provider_status:e.providerStatus||e.status||502,code:e.code||"SPACESHIP_QUERY_FAILED"},e.status&&e.status>=400&&e.status<500?e.status:502)}
+  }
+  const tldOrderMatch=path.match(/^\/tld\/orders\/([A-Za-z0-9_-]+)$/);
+  if(tldOrderMatch&&req.method==="GET"){
+   const u=await currentUser(req,env);if(!u)return respond({error:"请先登录后查看订单"},401);
+   const order=await env.DB.prepare("SELECT order_no,domain,status,provider,provider_operation_id,provider_error,provider_status,created_at,updated_at FROM tld_orders WHERE order_no=? AND user_id=?").bind(tldOrderMatch[1],u.id).first();
+   if(!order)return respond({ok:false,error:"订单不存在"},404);
+   if(order.provider==="spaceship"&&order.provider_operation_id&&["pending","registrar_pending","submitting"].includes(order.status)){
+    try{
+     const operation=await spaceshipRequest(env,"/async-operations/"+encodeURIComponent(order.provider_operation_id));
+     const providerState=String(operation.data.status||"pending").toLowerCase();
+     const nextStatus=providerState==="success"?"completed":providerState==="failed"?"failed":"pending";
+     const details=operation.data.details||{};
+     const providerError=nextStatus==="failed"?String(details.error||details.message||operation.data.message||"Spaceship 注册操作失败").slice(0,1000):null;
+     await env.DB.prepare("UPDATE tld_orders SET status=?,provider_response=?,provider_error=?,provider_status=?,updated_at=? WHERE order_no=? AND user_id=?").bind(nextStatus,JSON.stringify(operation.data).slice(0,8000),providerError,providerState==="failed"?502:null,new Date().toISOString(),order.order_no,u.id).run();
+     return respond({ok:true,order:{...order,status:nextStatus,provider_status:providerState,provider_error:providerError}});
+    }catch(e){return respond({ok:false,error:e.message||"无法查询注册商异步状态",code:e.code||"SPACESHIP_OPERATION_POLL_FAILED"},e.status&&e.status>=400&&e.status<500?e.status:502)}
+   }
+   return respond({ok:true,order});
   }
   if(path==="/tld/orders"&&req.method==="POST"){
    const u=await currentUser(req,env);if(!u)return respond({error:"请先登录后再购买顶级域名"},401);
@@ -121,9 +146,9 @@ const loginCode=b64(random()),expires=new Date(Date.now()+60000).toISOString();a
     const availability=await spaceshipRequest(env,"/domains/"+encodeURIComponent(domain)+"/available");
     if(availability.data.result!=="available")throw Object.assign(new Error("该域名已被注册或注册商当前不可注册（"+String(availability.data.result||"unknown")+"）"),{status:409,providerStatus:409,providerData:availability.data});
     const result=await spaceshipRequest(env,"/domains/"+encodeURIComponent(domain),"POST",{autoRenew:false,years:1,privacyProtection:{level:"high",userConsent:true},contacts:contactIds});
-    const operationId=result.headers.get("spaceship-async-operationid")||null,status=result.status===202?"registrar_pending":"submitted";
+    const operationId=result.headers.get("spaceship-async-operationid")||null,status=operationId?"pending":"submitted";
     await env.DB.prepare("UPDATE tld_orders SET status=?,provider_operation_id=?,provider_response=?,updated_at=? WHERE id=?").bind(status,operationId,JSON.stringify(result.data).slice(0,8000),new Date().toISOString(),orderId).run();
-    return respond({ok:true,order:{order_no:orderNo,domain,status,provider:"Spaceship",provider_operation_id:operationId},message:status==="registrar_pending"?"注册请求已提交，正在由 Spaceship 处理。":"注册请求已提交。"},202);
+    return respond({ok:true,order:{order_no:orderNo,domain,status,provider:"Spaceship",provider_operation_id:operationId},message:operationId?"注册请求已提交，正在等待注册商处理。":"注册请求已提交。"},202);
    }catch(e){
     const message=registrarErrorMessage(e),status=e.status||502;
     await env.DB.prepare("UPDATE tld_orders SET status='failed',provider_error=?,provider_status=?,updated_at=? WHERE id=?").bind(message,e.providerStatus||status,new Date().toISOString(),orderId).run();
