@@ -363,7 +363,7 @@ export default function App() {
                       <p>当前未配置邮件服务，验证码直接显示在这里；已自动填入上方输入框。</p>
                     </div>
                   )}
-                  <p className="hint">{codeSent ? "验证码已发送至邮箱，有效期 10 分钟；邮箱、密码和显示名称已锁定。" : "请先填写邮箱和密码，并勾选下方协议后获取验证码。"}</p>
+                  <p className="hint">{testVerificationCode ? "测试验证码已在上方显示并自动填入，有效期 10 分钟；确认信息后可直接创建账户。" : codeSent ? "验证码已发送至邮箱，有效期 10 分钟；邮箱、密码和显示名称已锁定。" : "请先填写邮箱和密码，并勾选下方协议后获取验证码。"}</p>
                   <div className="consents">
                     <label className="check-row"><input type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} disabled={codeSent} /><span>我已阅读并同意 <a href="#terms">用户服务协议</a></span></label>
                     <label className="check-row"><input type="checkbox" checked={privacyAccepted} onChange={e => setPrivacyAccepted(e.target.checked)} disabled={codeSent} /><span>我已阅读并同意 <a href="#privacy">隐私政策</a></span></label>
