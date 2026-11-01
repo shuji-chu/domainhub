@@ -9,7 +9,7 @@ function ServersPage({api,isAdmin}:{api:(path:string,init?:RequestInit)=>Promise
  useEffect(()=>{void load()},[]);
  const create=async()=>{setBusy(true);setError('');try{const d=await api('/api/servers/create',{method:'POST',body:JSON.stringify({name:'dh-'+Date.now().toString(36),region,size,image:'ubuntu-24-04-x64'})});setServers(v=>[d.droplet,...v]);await load()}catch(e:any){setError(e.message)}finally{setBusy(false)}};
  const runAction=async()=>{if(!pending)return;setBusy(true);setError('');try{await api('/api/servers/action',{method:'POST',body:JSON.stringify({id:pending.id,action:pending.action,image:'ubuntu-24-04-x64'})});setPending(null);await load()}catch(e:any){setError(e.message)}finally{setBusy(false)}};
- const actionLabel=(a:string)=>({create:'创建服务器',power_on:'开机',power_off:'关机',reboot:'重启',rebuild:'重装系统',delete:'删除服务器'} as Record<string,string>)[a]||a;
+ const actionLabel=(a:string)=>({power_on:'开机',power_off:'关机',reboot:'重启',rebuild:'重装系统',delete:'删除服务器'} as Record<string,string>)[a]||a;
  const fmt=(n:number)=>'$'+(Number(n)||0).toFixed(4);
  return <section className='panel'>
   <div className='section-head'><div><h2>云服务器管理</h2><p>DomainHub 控制台 · DigitalOcean 基础设施</p></div><button onClick={()=>void load()} disabled={busy}><RefreshCw size={14}/>刷新</button></div>
