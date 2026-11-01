@@ -136,6 +136,29 @@ export default {async fetch(req,env){
    const events=await env.DB.prepare("SELECT id,droplet_id,action,status,details,created_at FROM server_usage_events WHERE user_id=? ORDER BY created_at DESC LIMIT 200").bind(u.id).all();
    return respond({ok:true,disclaimer:"以下为按服务器规格月价及创建至删除（或当前）的自然时长估算，不是 DigitalOcean 实际账单。Droplet 关机期间通常仍可能计费；快照、备份、流量、税费及价格变化未计入。已删除服务器从功能启用后开始留存估算记录。",servers,events:events.results||[]});
   }
+  if(path==="/api/servers/billing"&&req.method==="GET"){
+   const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);
+   if(u.email.toLowerCase()!==ADMIN_EMAIL)return respond({error:"admin_only"},403);
+   if(!env.DIGITALOCEAN_TOKEN)return respond({error:"DIGITALOCEAN_TOKEN 未配置"},503);
+   const headers={"Authorization":"Bearer "+env.DIGITALOCEAN_TOKEN,"Accept":"application/json"};
+   const [balanceResponse,historyResponse]=await Promise.all([
+    fetch("https://api.digitalocean.com/v2/customers/my/balance",{headers}),
+    fetch("https://api.digitalocean.com/v2/customers/my/billing_history?per_page=200&page=1",{headers})
+   ]);
+   const balancePayload=await balanceResponse.json().catch(()=>({})),historyPayload=await historyResponse.json().catch(()=>({}));
+   if(!historyResponse.ok)return respond({error:historyPayload?.message||"DigitalOcean 账单读取失败；请确认 Token 具有 billing:read 权限"},historyResponse.status);
+   const balance=balanceResponse.ok?{
+    account_balance:balancePayload.account_balance||"0",
+    month_to_date_usage:balancePayload.month_to_date_usage||"0",
+    month_to_date_balance:balancePayload.month_to_date_balance||"0",
+    generated_at:balancePayload.generated_at||null
+   }:null;
+   const billing_history=(historyPayload.billing_history||[]).map(x=>({
+    amount:String(x.amount||"0"),date:x.date||null,description:String(x.description||""),
+    type:String(x.type||""),invoice_id:x.invoice_id||null,invoice_uuid:x.invoice_uuid||null
+   }));
+   return respond({ok:true,balance,billing_history,meta:historyPayload.meta||null})
+  }
   if(path==="/api/servers/detail"&&req.method==="GET"){
    const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);
    if(!env.DIGITALOCEAN_TOKEN)return respond({error:"DIGITALOCEAN_TOKEN 未配置"},503);
@@ -173,7 +196,7 @@ export default {async fetch(req,env){
     const data=await dnshe(env,"/zones?page="+page+"&per_page=100");
     const zones=data?.data?.zones||data?.zones||[];
     const meta=data?.data?.meta||data?.meta||{};
-    pages=Math.max(1,Math.min(100,Number(meta.total_pages||pages||1)));
+    pages=Number(meta.total_pages)>0?Math.max(1,Math.min(100,Number(meta.total_pages))):(zones.length===100?100:page);
     for(const z of zones){
      const zoneId=String(z.id||z.zone_id||""),domain=String(z.zone_name||z.name||z.domain||"").toLowerCase();
      if(!zoneId||!domain)continue;
