@@ -5,7 +5,7 @@ import "./styles.css";
 const API = "https://domainhub-api.chulingli1988.workers.dev";
 const TOKEN_KEY = "domainhub_token";
 type Mode = "login" | "register" | "verify";
-type ApiResult = { ok?: boolean; message?: string; error?: string; testMode?: boolean; verificationCode?: string; token?: string; user?: { id: string; email: string; displayName?: string | null; quota?: number } };
+type ApiResult = { ok?: boolean; message?: string; error?: string; testMode?: boolean; verificationCode?: string; token?: string; quota?: number; user?: { id: string; email: string; displayName?: string | null; quota?: number }; domains?: Array<{id:string;domain:string;status?:string}> };
 
 async function request(path: string, body: Record<string, unknown>): Promise<ApiResult> {
   const response = await fetch(API + path, {
@@ -32,6 +32,11 @@ export default function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [signedIn, setSignedIn] = useState<{ email: string; quota: number } | null>(null);
+  const [domains, setDomains] = useState<Array<{id:string;domain:string;status?:string}>>([]);
+  const [myDomains, setMyDomains] = useState<Array<{id:string;domain:string;status?:string}>>([]);
+  const [domainQuery, setDomainQuery] = useState("");
+  const [domainsLoading, setDomainsLoading] = useState(false);
+  const [claiming, setClaiming] = useState("");
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -77,6 +82,42 @@ export default function App() {
         .finally(() => setBusy(false));
     }
   }, []);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    const token = sessionStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    let cancelled = false;
+    setDomainsLoading(true);
+    Promise.all([
+      fetch(API + "/domains", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+      fetch(API + "/domains/mine", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+    ]).then(([available, mine]) => {
+      if (cancelled) return;
+      if (available?.ok) { setDomains(available.domains || []); setSignedIn(v => v ? {...v, quota:Number(available.quota ?? v.quota)} : v); }
+      if (mine?.ok) setMyDomains(mine.domains || []);
+      if (available?.error) setError(available.error);
+    }).catch(() => { if (!cancelled) setError("域名列表暂时无法加载，请稍后重试"); })
+      .finally(() => { if (!cancelled) setDomainsLoading(false); });
+    return () => { cancelled = true; };
+  }, [signedIn?.email]);
+
+  const claimDomain = async (id:string) => {
+    setClaiming(id); setError(""); setNotice("");
+    try {
+      const token = sessionStorage.getItem(TOKEN_KEY);
+      const response = await fetch(API + "/domains/claim", {method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},body:JSON.stringify({inventoryId:id})});
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "领取域名失败");
+      setNotice("域名已成功领取");
+      setDomains(v => v.filter(x => x.id !== id));
+      setMyDomains(v => [result.domain, ...v]);
+      setSignedIn(v => v ? {...v, quota:Number(result.quota ?? Math.max(0,v.quota-1))} : v);
+    } catch(err) { setError(err instanceof Error ? err.message : "领取域名失败"); }
+    finally { setClaiming(""); }
+  };
+
+  const filteredDomains = domains.filter(x => x.domain.toLowerCase().includes(domainQuery.trim().toLowerCase()));
 
   const startGithub = () => {
     const query = mode === "register" ? "?mode=register&terms=1.0&privacy=1.0" : "";
@@ -145,7 +186,7 @@ export default function App() {
         const result = await request("/auth/email/verification/send", { email });
         setNotice(result.message || "验证码已重新发送。");
         if (result.verificationCode) window.alert("【测试模式】您的验证码是："+result.verificationCode);
-        if (result.testMode) window.alert("验证码已发送（测试环境请在后台查看）");
+
       }
       setCountdown(60);
     } catch (err) {
@@ -198,39 +239,42 @@ export default function App() {
           <img className="brand-mark" src="/logo.svg" alt="" />
           <span>Domain<span className="brand-light">Hub</span></span>
         </a>
-        <span className="topbar-note">{"域名与 DNS 管理平台"}</span>
+        <span className="topbar-note">域名管理</span>
       </header>
 
       <section className="auth-layout">
         <div className="intro">
-          <div className="eyebrow"><span /> 简洁 · 安全 · 可控</div>
-          <h1>你的域名，<br /><span>由你掌控。</span></h1>
-          <p>在一个清晰、可靠的工作空间中管理域名与 DNS。安全登录，从这里开始。</p>
-          <div className="intro-points">
-            <div><i>01</i><span><b>统一管理</b><small>域名与解析信息一处查看</small></span></div>
-            <div><i>02</i><span><b>账户安全</b><small>邮箱验证与安全会话保护</small></span></div>
-            <div><i>03</i><span><b>清晰可控</b><small>每项操作都由你主动发起</small></span></div>
-          </div>
-          <div className="intro-foot"><span className="status-dot" /> 账户安全入口</div>
+          <div className="eyebrow"><span /> 域名管理平台</div>
+          <h1>域名管理<br /><span>一目了然。</span></h1>
+          <p>搜索、领取并管理你的域名。</p>
+          <div className="intro-search-preview"><span>⌕</span><span>搜索你需要的域名</span></div>
         </div>
 
         <section className="auth-card" aria-labelledby="auth-title">
           {signedIn ? (
-            <div className="success-state">
-              <div className="success-icon">✓</div>
-              <p className="card-kicker">身份验证完成</p>
-              <h2 id="auth-title">登录成功</h2>
-              <p className="muted">当前已通过身份验证。</p>
-              <div className="account-summary"><span>账户邮箱</span><b>{signedIn.email}</b><span>当前配额</span><b>{signedIn.quota}</b></div>
-              <button className="button button-primary" onClick={logout}>退出登录</button>
+            <div className="domain-home">
+              <div className="dashboard-top">
+                <div><p className="card-kicker">域名控制台</p><h2 id="auth-title">域名管理</h2><p className="muted">{signedIn.email}</p></div>
+                <div className="quota-chip">可用配额 <b>{signedIn.quota}</b></div>
+              </div>
+              <label className="domain-search"><span>⌕</span><input value={domainQuery} onChange={e=>setDomainQuery(e.target.value)} placeholder="搜索可用域名…" aria-label="搜索可用域名"/></label>
+              {error && <div className="feedback feedback-error" role="alert">{error}</div>}
+              {notice && <div className="feedback feedback-success" role="status">{notice}</div>}
+              <div className="domain-section-head"><h3>可领取域名</h3><span>{filteredDomains.length} 个</span></div>
+              <div className="domain-list">
+                {domainsLoading ? <div className="empty-domains">正在加载域名…</div> : filteredDomains.length ? filteredDomains.map(item=><div className="domain-row" key={item.id}><div className="domain-name"><span className="domain-dot"/><b>{item.domain}</b></div><button className="claim-button" disabled={!!claiming || signedIn.quota < 1} onClick={()=>void claimDomain(item.id)}>{claiming===item.id?"处理中…":"领取"}</button></div>) : <div className="empty-domains">{domainQuery?"没有匹配的域名":"暂无可领取域名"}</div>}
+              </div>
+              <div className="domain-section-head mine-head"><h3>我的域名</h3><span>{myDomains.length} 个</span></div>
+              <div className="domain-list mine-list">{myDomains.length ? myDomains.map(item=><div className="domain-row" key={item.id}><div className="domain-name"><span className="domain-dot owned"/><b>{item.domain}</b></div><span className="domain-status">已领取</span></div>) : <div className="empty-domains">还没有领取域名</div>}</div>
+              <button className="button button-logout" onClick={logout}>退出登录</button>
             </div>
           ) : (
             <>
               <div className="card-heading">
                 {mode === "register" && <div className="card-brand"><img src="/logo.svg" alt="DomainHub" /><span>Domain<span>Hub</span></span></div>}
-                <p className="card-kicker">欢迎使用 DomainHub</p>
+                <p className="card-kicker">欢迎使用</p>
                 <h2 id="auth-title">{mode === "register" ? "创建账户" : mode === "verify" ? "验证邮箱" : "欢迎回来"}</h2>
-                <p>{mode === "register" ? "填写信息，开启你的域名管理空间。" : mode === "verify" ? "输入发送到邮箱的 6 位验证码。" : "登录你的账户以继续使用 DomainHub。"}</p>
+                <p>{mode === "register" ? "填写信息，创建账户。" : mode === "verify" ? "输入发送到邮箱的 6 位验证码。" : "登录后管理你的域名。"}</p>
               </div>
 
               {mode !== "verify" && (
@@ -249,7 +293,7 @@ export default function App() {
                   <label>登录密码<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" /></label>
                   <button className="button button-primary" type="submit" disabled={busy}>{busy ? "正在登录…" : "登录账户"}<span>→</span></button>
                   <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 授权登录</button>
-                  <p className="form-foot">尚未拥有账户？ <button type="button" className="text-button" onClick={() => switchMode("register")}>立即注册</button></p>
+                  <p className="form-foot">还没有账户？ <button type="button" className="text-button" onClick={() => switchMode("register")}>立即注册</button></p>
                 </form>
               )}
 
