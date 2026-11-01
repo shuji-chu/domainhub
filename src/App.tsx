@@ -19,7 +19,7 @@ async function request(path: string, body: Record<string, unknown>): Promise<Api
     body: JSON.stringify(body),
   });
   const result = await response.json().catch(() => ({})) as ApiResult;
-  if (!response.ok) throw new Error(result.error || result.message || "请求失败，请稍后重试");
+  if (!response.ok) throw new Error(result.message || (result.error === "internal_error" ? "服务器内部错误，请查看服务端诊断信息" : result.error) || "请求失败，请稍后重试");
   return result;
 }
 
