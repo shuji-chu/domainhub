@@ -9,7 +9,8 @@ const API = "https://domainhub-api.chulingli1988.workers.dev";
 const TOKEN_KEY = "domainhub_token";
 type Mode = "login" | "register" | "verify";
 type ApiResult = { ok?: boolean; message?: string; error?: string; token?: string; quota?: number; price_usdt?: number; order?: { order_no:string; domain:string; price_usdt:number; currency:string; status:string }; user?: { id: string; email: string; displayName?: string | null; quota?: number }; domains?: Array<{id:string;domain:string;status?:string}> };
-type TldQuote = { domain:string; availability:string; available:boolean; price:number|null; currency:string; priceClass:string; provider:string; period:string };
+type TldQuote = { domain:string; availability:"available"|"unavailable"|"unknown"; availabilityRaw?:string; available:boolean; price:number|null; currency:string; priceClass:string; provider:string; period:string };
+type TldOrder = { order_no:string; domain:string; status:string; provider_status?:string|null; provider_error?:string|null };
 
 async function request(path: string, body: Record<string, unknown>): Promise<ApiResult> {
   const response = await fetch(API + path, {
@@ -47,6 +48,7 @@ export default function App() {
   const [tldQuote, setTldQuote] = useState<TldQuote | null>(null);
   const [tldLoading, setTldLoading] = useState(false);
   const [tldOrderLoading, setTldOrderLoading] = useState(false);
+  const [tldOrderStatus, setTldOrderStatus] = useState<TldOrder | null>(null);
   const [page, setPage] = useState("overview");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [dnsDomainId, setDnsDomainId] = useState("");
@@ -209,13 +211,28 @@ export default function App() {
   async function buyTld() {
     if (!tldQuote) return;
     if (!signedIn) { switchMode("login"); return; }
-    setTldOrderLoading(true); setError(""); setNotice("");
+    setTldOrderLoading(true); setError(""); setNotice(""); setTldOrderStatus(null);
     try {
       const token = sessionStorage.getItem(TOKEN_KEY);
       const response = await fetch(API + "/tld/orders", { method:"POST", headers:{ "Content-Type":"application/json", Authorization:"Bearer " + token }, body:JSON.stringify({domain:tldQuote.domain}) });
       const result = await response.json() as ApiResult;
-      if (!response.ok || !result.ok) throw new Error(result.error || "注册商拒绝了本次注册请求");
-      setNotice("注册请求已提交给 Spaceship。订单号：" + (result.order?.order_no || "已受理") + "；当前状态：" + (result.order?.status || "处理中") + "。");
+      if (!response.ok || !result.ok || !result.order?.order_no) throw new Error(result.error || "注册商拒绝了本次注册请求");
+      let latest: TldOrder = {order_no:result.order.order_no,domain:result.order.domain,status:result.order.status};
+      setTldOrderStatus(latest);
+      if (latest.status === "pending") {
+        for (let attempt=0; attempt<20; attempt++) {
+          await new Promise(resolve => window.setTimeout(resolve, 3000));
+          const statusResponse = await fetch(API + "/tld/orders/" + encodeURIComponent(latest.order_no), {headers:{Authorization:"Bearer " + token}});
+          const statusResult = await statusResponse.json() as {ok?:boolean;error?:string;order?:TldOrder};
+          if (!statusResponse.ok || !statusResult.ok || !statusResult.order) throw new Error(statusResult.error || "查询注册进度失败");
+          latest = statusResult.order;
+          setTldOrderStatus(latest);
+          if (latest.status === "completed" || latest.status === "failed") break;
+        }
+      }
+      if (latest.status === "completed") setNotice("域名注册成功，订单号：" + latest.order_no);
+      else if (latest.status === "failed") setError(latest.provider_error || "Spaceship 注册失败，请查看订单详情。");
+      else setNotice("注册请求已提交，订单号：" + latest.order_no + "；当前状态：" + (latest.status === "pending" ? "注册商处理中，页面会继续更新" : "等待注册商确认") + "。");
     } catch (err) { setError(err instanceof Error ? err.message : "订单创建失败"); }
     finally { setTldOrderLoading(false); }
   }
@@ -414,9 +431,10 @@ export default function App() {
             {tldQuote && (
               <div className="tld-quote">
                 <div><span className="tld-label">查询域名</span><strong>{tldQuote.domain}</strong></div>
-                <div><span className="tld-label">实时可用性</span><strong className={tldQuote.available ? "tld-available" : "tld-unavailable"}>{tldQuote.availability === "available" ? "可以注册" : tldQuote.availability === "unavailable" ? "已被注册" : tldQuote.availability}</strong></div>
+                <div><span className="tld-label">实时可用性</span><strong className={tldQuote.available ? "tld-available" : "tld-unavailable"}>{tldQuote.availability === "available" ? "可以注册" : tldQuote.availability === "unavailable" ? "已被注册" : "暂时无法确认"}</strong></div>
                 <div><span className="tld-label">Spaceship 实时报价</span><strong className="tld-price">{tldQuote.price == null ? "暂无报价" : tldQuote.price.toFixed(2) + " " + tldQuote.currency} <small>/ 年</small></strong></div>
                 <p>数据来自 Spaceship 实时 API；域名价格可能因高级域名、促销和注册局规则变化。</p>
+                {tldOrderStatus && <p role="status">订单 {tldOrderStatus.order_no}：{tldOrderStatus.status === "completed" ? "注册成功" : tldOrderStatus.status === "failed" ? "注册失败" : tldOrderStatus.status === "pending" ? "注册商处理中" : "已提交"}</p>}
                 <button type="button" className="button button-primary tld-buy" disabled={tldOrderLoading || !tldQuote.available} onClick={() => void buyTld()}>{tldOrderLoading ? "正在提交注册…" : tldQuote.available ? "立即下单" : "当前不可注册"}</button>
               </div>
             )}
