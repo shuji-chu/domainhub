@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Github } from "lucide-react";
 import "./styles.css";
 
 const API = "https://domainhub-api.chulingli1988.workers.dev";
@@ -30,6 +31,16 @@ export default function App() {
   const [signedIn, setSignedIn] = useState<{ email: string; quota: number } | null>(null);
 
   useEffect(() => {
+    const savedToken = sessionStorage.getItem("domainhub_token");
+    if (savedToken) {
+      fetch(API + "/auth/me", { headers: { Authorization: `Bearer ${savedToken}` } })
+        .then(async response => {
+          const result = await response.json().catch(() => ({})) as ApiResult;
+          if (!response.ok || !result.user) throw new Error("会话已失效");
+          setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
+        })
+        .catch(() => sessionStorage.removeItem("domainhub_token"));
+    }
     const params = new URLSearchParams(window.location.search);
     const oauthCode = params.get("oauth_code");
     const authError = params.get("auth_error");
@@ -60,7 +71,8 @@ export default function App() {
 
   const startGithub = () => {
     const query = mode === "register" ? "?mode=register&terms=1.0&privacy=1.0" : "";
-    window.location.assign(API + "/auth/github/start" + query);
+    // Start OAuth on the same lynli.me host as the registered callback so the __Host cookie is returned.
+    window.location.assign("https://lynli.me/api/github-oauth/start" + query);
   };
 
   const switchMode = (next: Mode) => {
@@ -124,6 +136,8 @@ export default function App() {
   }
 
   function logout() {
+    const token = sessionStorage.getItem("domainhub_token");
+    if (token) void fetch(API + "/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     sessionStorage.removeItem("domainhub_token");
     setSignedIn(null);
     setEmail("");
@@ -188,9 +202,9 @@ export default function App() {
               {mode === "login" && (
                 <form onSubmit={handleLogin} className="auth-form">
                   <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
-                  <label>登录密码<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码（至少 12 位）" /></label>
+                  <label>登录密码<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" /></label>
                   <button className="button button-primary" type="submit" disabled={busy}>{busy ? "正在登录…" : "登录账户"}<span>→</span></button>
-                  <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy}><span className="github-mark">●</span> 使用 GitHub 授权登录</button>
+                  <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 授权登录</button>
                   <p className="form-foot">尚未拥有账户？ <button type="button" className="text-button" onClick={() => switchMode("register")}>立即注册</button></p>
                 </form>
               )}
@@ -205,7 +219,7 @@ export default function App() {
                     <label className="check-row"><input type="checkbox" checked={privacyAccepted} onChange={e => setPrivacyAccepted(e.target.checked)} /><span>我已阅读并同意 <a href="#privacy">隐私政策</a></span></label>
                   </div>
                   <button className="button button-primary" type="submit" disabled={busy || !termsAccepted || !privacyAccepted}>{busy ? "正在创建账户…" : "创建账户"}<span>→</span></button>
-                  <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy || !termsAccepted || !privacyAccepted}><span className="github-mark">●</span> 使用 GitHub 授权注册</button>
+                  <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy || !termsAccepted || !privacyAccepted}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 授权注册</button>
                   <p className="form-foot">已有账户？ <button type="button" className="text-button" onClick={() => switchMode("login")}>返回登录</button></p>
                 </form>
               )}
