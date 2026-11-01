@@ -265,7 +265,7 @@ export default function App() {
         <div className="home-heading">
           <div className="eyebrow"><span /> 域名资源中心</div>
           <h1>寻找合适的域名。<br /><span>从这里开始。</span></h1>
-          <p>搜索真实可用域名，登录后即可领取并管理。</p>
+          <p>查找可用域名，登录后即可领取与管理。</p>
         </div>
         <label className="domain-search home-search">
           <span>⌕</span>
