@@ -4,6 +4,7 @@ import "./styles.css";
 
 const TEST_ENV = new URLSearchParams(window.location.search).get("env") === "test";
 const API = TEST_ENV ? "https://domainhub-api-test.chulingli1988.workers.dev" : "https://domainhub-api.chulingli1988.workers.dev";
+const TOKEN_KEY = TEST_ENV ? "domainhub_test_token" : TOKEN_KEY;
 type Mode = "login" | "register" | "verify";
 type ApiResult = { ok?: boolean; message?: string; error?: string; testMode?: boolean; token?: string; user?: { id: string; email: string; displayName?: string | null; quota?: number } };
 
@@ -20,7 +21,7 @@ async function request(path: string, body: Record<string, unknown>): Promise<Api
 
 export default function App() {
   const [mode, setMode] = useState<Mode>("login");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(TEST_ENV ? "domainhub-test@example.com" : "");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [code, setCode] = useState("");
@@ -40,7 +41,7 @@ export default function App() {
   }, [countdown > 0]);
 
   useEffect(() => {
-    const savedToken = sessionStorage.getItem("domainhub_token");
+    const savedToken = sessionStorage.getItem(TOKEN_KEY);
     if (savedToken) {
       fetch(API + "/auth/me", { headers: { Authorization: `Bearer ${savedToken}` } })
         .then(async response => {
@@ -48,7 +49,7 @@ export default function App() {
           if (!response.ok || !result.user) throw new Error("会话已失效");
           setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
         })
-        .catch(() => sessionStorage.removeItem("domainhub_token"));
+        .catch(() => sessionStorage.removeItem(TOKEN_KEY));
     }
     const params = new URLSearchParams(window.location.search);
     const oauthCode = params.get("oauth_code");
@@ -69,7 +70,7 @@ export default function App() {
       request("/auth/github/exchange", { code: oauthCode })
         .then(result => {
           if (!result.token || !result.user) throw new Error("授权登录响应不完整，请重试");
-          sessionStorage.setItem("domainhub_token", result.token);
+          sessionStorage.setItem(TOKEN_KEY, result.token);
           setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
           window.history.replaceState({}, "", window.location.pathname);
         })
@@ -96,7 +97,7 @@ export default function App() {
     try {
       const result = await request("/auth/login", { email, password });
       if (!result.token || !result.user) throw new Error("登录响应不完整，请重试");
-      sessionStorage.setItem("domainhub_token", result.token);
+      sessionStorage.setItem(TOKEN_KEY, result.token);
       setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
       setPassword("");
     } catch (err) {
@@ -175,9 +176,9 @@ export default function App() {
   }
 
   function logout() {
-    const token = sessionStorage.getItem("domainhub_token");
+    const token = sessionStorage.getItem(TOKEN_KEY);
     if (token) void fetch(API + "/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-    sessionStorage.removeItem("domainhub_token");
+    sessionStorage.removeItem(TOKEN_KEY);
     setSignedIn(null);
     setEmail("");
     setPassword("");
@@ -244,7 +245,7 @@ export default function App() {
                   <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
                   <label>登录密码<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" /></label>
                   <button className="button button-primary" type="submit" disabled={busy}>{busy ? "正在登录…" : "登录账户"}<span>→</span></button>
-                  <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 授权登录</button>
+                  {!TEST_ENV && <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 授权登录</button> }
                   <p className="form-foot">尚未拥有账户？ <button type="button" className="text-button" onClick={() => switchMode("register")}>立即注册</button></p>
                 </form>
               )}
