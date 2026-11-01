@@ -1,7 +1,6 @@
 name: Deploy DomainHub API Worker
 on:
-  push:
-    branches: [feat/auth-core]
+  # Production deployment is intentionally manual; feature branch pushes only run CI.
   workflow_dispatch:
     inputs:
       confirm_deploy:
