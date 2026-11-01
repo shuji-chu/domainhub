@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 :root{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#e8f1ff;background:#06101f;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;font-weight:400}
 *{box-sizing:border-box}body{margin:0;min-width:320px;min-height:100vh}button,input{font:inherit}button{cursor:pointer}
@@ -18,3 +22,102 @@
 .home-shell{min-height:100vh}.home-content{position:relative;z-index:1;width:min(900px,100%);margin:0 auto;padding:70px 0}.home-heading{text-align:center}.home-heading h1{font-size:54px;color:#f0f7ff}.home-heading h1 span{color:#5dbaff}.home-nav{display:flex;align-items:center;gap:12px}.nav-button{height:38px;padding:0 16px;border-radius:9px;border:1px solid rgba(126,174,224,.24);color:#c7d9ed;background:#102844}.nav-button-primary{color:#041326;background:linear-gradient(105deg,#56b7ff,#45d4e5)}.auth-overlay{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:22px;background:rgba(1,8,18,.76);backdrop-filter:blur(12px)}.auth-modal{position:relative;width:min(460px,100%);max-height:calc(100vh - 44px);overflow:auto}.auth-close{position:absolute;right:17px;top:13px;width:30px;height:30px;border:1px solid #34516d;border-radius:8px;background:#102844;color:#b9d3ef;font-size:22px}
 
 
+
+
+/* DomainHub 深色设计系统 */
+:root {
+  color-scheme: dark;
+  --background: 222 47% 4%;
+  --foreground: 210 40% 98%;
+  --card: 222 42% 7%;
+  --card-foreground: 210 40% 98%;
+  --primary: 199 92% 62%;
+  --primary-foreground: 222 47% 6%;
+  --secondary: 217 33% 14%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 217 28% 13%;
+  --muted-foreground: 215 20% 68%;
+  --accent: 217 32% 16%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 72% 54%;
+  --border: 217 25% 18%;
+  --input: 217 25% 18%;
+  --ring: 199 92% 62%;
+  --radius: 0.8rem;
+}
+html { background: #07090e; scroll-behavior: smooth; }
+body { background: #07090e; color: #f4f7fb; }
+::selection { color: #04111c; background: #7dd3fc; }
+button, a, input { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible { outline: 2px solid #67c9ff; outline-offset: 3px; }
+.auth-shell {
+  background-color: #07090e;
+  background-image:
+    radial-gradient(ellipse at 50% -12%, rgba(31, 112, 190, .22), transparent 43%),
+    radial-gradient(ellipse at 92% 82%, rgba(9, 145, 163, .09), transparent 32%),
+    linear-gradient(rgba(148, 163, 184, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, .035) 1px, transparent 1px);
+  background-size: auto, auto, 42px 42px, 42px 42px;
+}
+.topbar { border-color: rgba(148, 163, 184, .13); }
+.brand { font-family: Manrope, "Microsoft YaHei", sans-serif; letter-spacing: -1px; }
+.brand-mark { filter: drop-shadow(0 0 14px rgba(78, 180, 255, .18)); }
+.nav-button, .button-oauth, .mode-switch, .auth-card, .domain-list, .domain-search {
+  backdrop-filter: blur(18px);
+}
+.nav-button { transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+.nav-button:hover { transform: translateY(-1px); border-color: rgba(104, 196, 255, .5); box-shadow: 0 0 24px rgba(56, 189, 248, .1); }
+.nav-button-primary { box-shadow: 0 8px 26px rgba(56, 189, 248, .2); }
+.auth-card {
+  background: linear-gradient(155deg, rgba(15, 23, 42, .96), rgba(7, 12, 22, .96));
+  border-color: rgba(148, 163, 184, .19);
+  box-shadow: 0 32px 100px rgba(0,0,0,.52), 0 0 0 1px rgba(255,255,255,.018), 0 0 48px rgba(14, 116, 190, .08);
+}
+.auth-form input:not([type=checkbox]) {
+  background: rgba(2, 6, 14, .78);
+  border-color: rgba(148, 163, 184, .2);
+  color: #f8fafc;
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease, transform .2s ease;
+}
+.auth-form input:not([type=checkbox]):hover { border-color: rgba(148, 163, 184, .38); }
+.auth-form input:not([type=checkbox]):focus {
+  background: rgba(4, 13, 25, .96);
+  border-color: rgba(56, 189, 248, .82);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, .13), 0 0 28px rgba(56, 189, 248, .11);
+}
+.button-primary {
+  background: linear-gradient(110deg, #7dd3fc 0%, #38bdf8 54%, #22d3ee 100%);
+  box-shadow: 0 10px 30px rgba(14, 165, 233, .19), inset 0 1px 0 rgba(255,255,255,.34);
+  transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
+}
+.button-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: saturate(1.12);
+  box-shadow: 0 14px 36px rgba(14, 165, 233, .28), 0 0 28px rgba(56, 189, 248, .15);
+}
+.button-oauth { background: rgba(30, 41, 59, .58); border-color: rgba(148, 163, 184, .2); }
+.button-oauth:hover:not(:disabled) { border-color: rgba(125, 211, 252, .44); box-shadow: 0 0 26px rgba(56, 189, 248, .08); }
+.mode-switch { background: rgba(2, 6, 14, .6); border-color: rgba(148, 163, 184, .13); }
+.mode-switch button.active { background: rgba(56, 189, 248, .13); color: #bae6fd; box-shadow: inset 0 0 0 1px rgba(56, 189, 248, .2), 0 0 20px rgba(56, 189, 248, .08); }
+.domain-search { background: rgba(10, 16, 27, .8); border-color: rgba(148, 163, 184, .22); }
+.domain-search:focus-within { border-color: rgba(56, 189, 248, .7); box-shadow: 0 0 0 3px rgba(56, 189, 248, .1), 0 0 34px rgba(56, 189, 248, .08); }
+.domain-list { background: rgba(9, 14, 24, .72); border-color: rgba(148, 163, 184, .16); }
+.domain-row { transition: background .18s ease; }
+.domain-row:hover { background: rgba(56, 189, 248, .045); }
+.claim-button { transition: background .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.claim-button:hover:not(:disabled) { background: rgba(14, 165, 233, .2); border-color: rgba(56, 189, 248, .55); box-shadow: 0 0 18px rgba(56, 189, 248, .1); }
+.home-heading h1 { letter-spacing: -2.8px; line-height: 1.16; }
+.home-heading h1 span { background: linear-gradient(100deg, #7dd3fc, #38bdf8 55%, #5eead4); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.eyebrow { letter-spacing: 1.8px; }
+.site-footer { color: #94a3b8; border-color: rgba(148, 163, 184, .13); }
+.feedback-error, .feedback-success { backdrop-filter: blur(12px); }
+.auth-overlay { background: rgba(2, 5, 11, .82); }
+.auth-close { transition: border-color .18s ease, color .18s ease, background .18s ease; }
+.auth-close:hover { border-color: rgba(125, 211, 252, .5); color: white; background: #17324a; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+@media(max-width:760px) {
+  .home-content { padding: 48px 0 42px; }
+  .home-heading h1 { font-size: clamp(38px, 10vw, 48px); letter-spacing: -1.9px; }
+}
