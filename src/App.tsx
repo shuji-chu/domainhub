@@ -191,7 +191,6 @@ export default function App() {
                   <label>登录密码<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码（至少 12 位）" /></label>
                   <button className="button button-primary" type="submit" disabled={busy}>{busy ? "正在登录…" : "登录账户"}<span>→</span></button>
                   <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy}><span className="github-mark">●</span> 使用 GitHub 授权登录</button>
-                  <button type="button" className="text-button forgot-link" onClick={() => { setError(""); setNotice("密码找回功能即将接入。"); }}>忘记密码？</button>
                   <p className="form-foot">尚未拥有账户？ <button type="button" className="text-button" onClick={() => switchMode("register")}>立即注册</button></p>
                 </form>
               )}
