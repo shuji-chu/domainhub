@@ -307,25 +307,6 @@ export default function App() {
         <div className="auth-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setAuthOpen(false); }}>
           <section className="auth-card auth-modal" aria-labelledby="auth-title">
             <button className="auth-close" type="button" aria-label="关闭" onClick={() => setAuthOpen(false)}>×</button>
-          {signedIn ? (
-            <div className="domain-home">
-              <div className="dashboard-top">
-                <div><p className="card-kicker">域名控制台</p><h2 id="auth-title">域名管理</h2><p className="muted">{signedIn.email}</p></div>
-                <div className="quota-chip">可用配额 <b>{signedIn.quota}</b></div>
-              </div>
-              <label className="domain-search"><span>⌕</span><input value={domainQuery} onChange={e=>setDomainQuery(e.target.value)} placeholder="搜索可用域名…" aria-label="搜索可用域名"/></label>
-              {error && <div className="feedback feedback-error" role="alert">{error}</div>}
-              {notice && <div className="feedback feedback-success" role="status">{notice}</div>}
-              <div className="domain-section-head"><h3>可领取域名</h3><span>{filteredDomains.length} 个</span></div>
-              <div className="domain-list">
-                {domainsLoading ? <div className="empty-domains">正在加载域名…</div> : filteredDomains.length ? filteredDomains.map(item=><div className="domain-row" key={item.id}><div className="domain-name"><span className="domain-dot"/><b>{item.domain}</b></div><button className="claim-button" disabled={!!claiming || signedIn.quota < 1} onClick={()=>void claimDomain(item.id)}>{claiming===item.id?"处理中…":"领取"}</button></div>) : <div className="empty-domains">{domainQuery?"没有匹配的域名":"暂无可领取域名"}</div>}
-              </div>
-              <div className="domain-section-head mine-head"><h3>我的域名</h3><span>{myDomains.length} 个</span></div>
-              <div className="domain-list mine-list">{myDomains.length ? myDomains.map(item=><div className="domain-row" key={item.id}><div className="domain-name"><span className="domain-dot owned"/><b>{item.domain}</b></div><span className="domain-status">已领取</span></div>) : <div className="empty-domains">还没有领取域名</div>}</div>
-              <button className="button button-logout" onClick={logout}>退出登录</button>
-            </div>
-          ) : (
-            <>
               <div className="card-heading">
                 {mode === "register" && <div className="card-brand"><img src="/logo.svg" alt="DomainHub" /><span>Domain<span>Hub</span></span></div>}
                 <p className="card-kicker">欢迎使用</p>
@@ -381,8 +362,6 @@ export default function App() {
                   <p className="hint">验证码有效期为 10 分钟。若未收到，请检查垃圾邮件文件夹。</p>
                 </form>
               )}
-            </>
-          )}
           </section>
         </div>
       )}
