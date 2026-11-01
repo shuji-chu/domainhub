@@ -227,3 +227,63 @@ button:focus-visible, a:focus-visible { outline: 2px solid #67c9ff; outline-offs
 .button-oauth{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:46px;margin-top:12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;color:#0f172a;font-weight:650}
 .button-oauth:hover{border-color:#2563eb;background:#f8fbff}
 @media(max-width:420px){.domain-tabs{margin-top:18px}.tld-quote{padding:16px}.tld-price{font-size:19px}}
+
+/* Mobile account header: prevent email and quota from colliding with the brand */
+.home-user {
+  display: block;
+  min-width: 0;
+  max-width: min(34vw, 260px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-nav {
+  min-width: 0;
+  flex: 0 1 auto;
+  justify-content: flex-end;
+}
+@media (max-width: 640px) {
+  .topbar {
+    height: auto;
+    min-height: 68px;
+    padding: 12px 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 10px;
+  }
+  .topbar > .brand {
+    flex: 1 0 100%;
+    min-width: 0;
+  }
+  .home-nav {
+    width: 100%;
+    flex: 1 1 100%;
+    min-width: 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .home-user {
+    flex: 1 1 auto;
+    max-width: calc(100% - 150px);
+    font-size: 12px;
+  }
+  .home-nav .quota-chip {
+    flex: 0 0 auto;
+    padding: 8px 9px;
+    font-size: 10px;
+  }
+  .home-nav .nav-button {
+    flex: 0 0 auto;
+    padding: 0 11px;
+    height: 34px;
+    font-size: 11px;
+  }
+}
+@media (max-width: 380px) {
+  .home-user { max-width: calc(100% - 138px); font-size: 11px; }
+  .home-nav { gap: 6px; }
+  .home-nav .quota-chip { padding: 7px 7px; }
+  .home-nav .nav-button { padding: 0 8px; }
+}
