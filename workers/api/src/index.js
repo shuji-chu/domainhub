@@ -66,13 +66,13 @@ export default {async fetch(req,env){
    const b=await req.json(),zoneId=String(b.zoneId||""),type=String(b.type||"").toUpperCase(),name=String(b.name||"@").trim(),value=String(b.value||"").trim(),ttl=Number(b.ttl??600);
    if(!["A","AAAA","CNAME","MX","TXT","SRV","CAA"].includes(type))return respond({error:"不支持的 DNS 记录类型"},400);
    if(!name||name.length>253||!value||!Number.isInteger(ttl)||(ttl!==0&&(ttl<60||ttl>86400)))return respond({error:"记录参数无效"},400);
-   if(type==="A"&&(!/^\\d{1,3}(\\.\\d{1,3}){3}$/.test(value)||value.split(".").some(x=>Number(x)>255)))return respond({error:"A 记录必须填写有效 IPv4 地址"},400);
+   if(type==="A"&&(!/^\d{1,3}(\.\d{1,3}){3}$/.test(value)||value.split(".").some(x=>Number(x)>255)))return respond({error:"A 记录必须填写有效 IPv4 地址"},400);
    if(type==="AAAA"&&(!value.includes(":")||!/^[0-9a-f:]+$/i.test(value)))return respond({error:"AAAA 记录必须填写有效 IPv6 地址"},400);
    if(type==="CNAME"&&!/^(?=.{1,253}$)[a-z0-9.-]+$/i.test(value))return respond({error:"CNAME 记录值无效"},400);
-   if(type==="TXT"&&(value.length>2048||/[\\r\\n\\0]/.test(value)))return respond({error:"TXT 记录不能超过 2048 字符或包含换行"},400);
-   if(type==="MX"&&!/^\\d{1,5}\\s+[^\\s]+$/.test(value))return respond({error:"MX 记录格式应为“优先级 邮件服务器”"},400);
-   if(type==="SRV"&&!/^\\d{1,5}\\s+\\d{1,5}\\s+\\d{1,5}\\s+[^\\s]+$/.test(value))return respond({error:"SRV 记录格式应为“优先级 权重 端口 目标”"},400);
-   if(type==="CAA"&&!/^\\d{1,3}\\s+[^\\s]+\\s+.+$/.test(value))return respond({error:"CAA 记录格式应为“标志 标签 值”"},400);
+   if(type==="TXT"&&(value.length>2048||/[\r\n\0]/.test(value)))return respond({error:"TXT 记录不能超过 2048 字符或包含换行"},400);
+   if(type==="MX"&&!/^\d{1,5}\s+[^\s]+$/.test(value))return respond({error:"MX 记录格式应为“优先级 邮件服务器”"},400);
+   if(type==="SRV"&&!/^\d{1,5}\s+\d{1,5}\s+\d{1,5}\s+[^\s]+$/.test(value))return respond({error:"SRV 记录格式应为“优先级 权重 端口 目标”"},400);
+   if(type==="CAA"&&!/^\d{1,3}\s+[^\s]+\s+.+$/.test(value))return respond({error:"CAA 记录格式应为“标志 标签 值”"},400);
    const owned=await env.DB.prepare("SELECT ud.domain FROM user_domains ud JOIN domain_inventory di ON di.id=ud.inventory_id WHERE ud.user_id=? AND ud.dnshe_zone_id=? AND ud.status='active' AND COALESCE(di.is_test,0)=0").bind(u.id,zoneId).first();
    if(!owned)return respond({error:"无权管理此域名"},403);
    const data=await dnshe(env,"/zones/"+encodeURIComponent(zoneId)+"/records","POST",{name,type,value,ttl,line:String(b.line||"default"),enabled:b.enabled!==false,remark:String(b.remark||"").slice(0,255)});
@@ -81,16 +81,16 @@ export default {async fetch(req,env){
   if(path==="/dns/records"&&req.method==="PATCH"){
    const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);
    const b=await req.json(),zoneId=String(b.zoneId||""),recordId=String(b.recordId||""),type=String(b.type||"").toUpperCase(),name=String(b.name||"@").trim(),value=String(b.value||"").trim(),ttl=Number(b.ttl??600);
-   if(!/^\\d{12}$/.test(recordId))return respond({error:"DNS 记录编号无效"},400);
+   if(!/^\d{12}$/.test(recordId))return respond({error:"DNS 记录编号无效"},400);
    if(!["A","AAAA","CNAME","MX","TXT","SRV","CAA"].includes(type))return respond({error:"不支持的 DNS 记录类型"},400);
    if(!name||name.length>253||!value||!Number.isInteger(ttl)||(ttl!==0&&(ttl<60||ttl>86400)))return respond({error:"记录参数无效"},400);
-   if(type==="A"&&(!/^\\d{1,3}(\\.\\d{1,3}){3}$/.test(value)||value.split(".").some(x=>Number(x)>255)))return respond({error:"A 记录必须填写有效 IPv4 地址"},400);
+   if(type==="A"&&(!/^\d{1,3}(\.\d{1,3}){3}$/.test(value)||value.split(".").some(x=>Number(x)>255)))return respond({error:"A 记录必须填写有效 IPv4 地址"},400);
    if(type==="AAAA"&&(!value.includes(":")||!/^[0-9a-f:]+$/i.test(value)))return respond({error:"AAAA 记录必须填写有效 IPv6 地址"},400);
    if(type==="CNAME"&&!/^(?=.{1,253}$)[a-z0-9.-]+$/i.test(value))return respond({error:"CNAME 记录值无效"},400);
-   if(type==="TXT"&&(value.length>2048||/[\\r\\n\\0]/.test(value)))return respond({error:"TXT 记录不能超过 2048 字符或包含换行"},400);
-   if(type==="MX"&&!/^\\d{1,5}\\s+[^\\s]+$/.test(value))return respond({error:"MX 记录格式应为“优先级 邮件服务器”"},400);
-   if(type==="SRV"&&!/^\\d{1,5}\\s+\\d{1,5}\\s+\\d{1,5}\\s+[^\\s]+$/.test(value))return respond({error:"SRV 记录格式应为“优先级 权重 端口 目标”"},400);
-   if(type==="CAA"&&!/^\\d{1,3}\\s+[^\\s]+\\s+.+$/.test(value))return respond({error:"CAA 记录格式应为“标志 标签 值”"},400);
+   if(type==="TXT"&&(value.length>2048||/[\r\n\0]/.test(value)))return respond({error:"TXT 记录不能超过 2048 字符或包含换行"},400);
+   if(type==="MX"&&!/^\d{1,5}\s+[^\s]+$/.test(value))return respond({error:"MX 记录格式应为“优先级 邮件服务器”"},400);
+   if(type==="SRV"&&!/^\d{1,5}\s+\d{1,5}\s+\d{1,5}\s+[^\s]+$/.test(value))return respond({error:"SRV 记录格式应为“优先级 权重 端口 目标”"},400);
+   if(type==="CAA"&&!/^\d{1,3}\s+[^\s]+\s+.+$/.test(value))return respond({error:"CAA 记录格式应为“标志 标签 值”"},400);
    const owned=await env.DB.prepare("SELECT ud.domain FROM user_domains ud JOIN domain_inventory di ON di.id=ud.inventory_id WHERE ud.user_id=? AND ud.dnshe_zone_id=? AND ud.status='active' AND COALESCE(di.is_test,0)=0").bind(u.id,zoneId).first();
    if(!owned)return respond({error:"无权管理此域名"},403);
    const patch={name,type,value,ttl,line:String(b.line||"default"),enabled:b.enabled!==false};
@@ -101,7 +101,7 @@ export default {async fetch(req,env){
   if(path==="/dns/records"&&req.method==="DELETE"){
    const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);
    const b=await req.json(),zoneId=String(b.zoneId||""),recordId=String(b.recordId||"");
-   if(!/^\\d{12}$/.test(recordId))return respond({error:"DNS 记录编号无效"},400);
+   if(!/^\d{12}$/.test(recordId))return respond({error:"DNS 记录编号无效"},400);
    const owned=await env.DB.prepare("SELECT ud.domain FROM user_domains ud JOIN domain_inventory di ON di.id=ud.inventory_id WHERE ud.user_id=? AND ud.dnshe_zone_id=? AND ud.status='active' AND COALESCE(di.is_test,0)=0").bind(u.id,zoneId).first();
    if(!owned)return respond({error:"无权管理此域名"},403);
    const data=await dnshe(env,"/zones/"+encodeURIComponent(zoneId)+"/records/"+encodeURIComponent(recordId),"DELETE");
