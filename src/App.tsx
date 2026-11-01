@@ -386,7 +386,11 @@ export default function App() {
                   <label>邮箱地址<Input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="请输入邮箱地址" /></label>
                   <label>登录密码<Input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" /></label>
                   <Button className="button button-primary" type="submit" disabled={busy}>{busy ? "正在登录…" : "登录账户"}<span>→</span></Button>
-                  <button className="button button-oauth" type="button" onClick={() => startGithub("login")} disabled={busy}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 账号授权登录</button>
+                  <div className="consents oauth-consents">
+                    <label className="check-row"><input type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} /><span>我已阅读并同意 <a href="#terms">用户服务协议</a></span></label>
+                    <label className="check-row"><input type="checkbox" checked={privacyAccepted} onChange={e => setPrivacyAccepted(e.target.checked)} /><span>我已阅读并同意 <a href="#privacy">隐私政策</a></span></label>
+                  </div>
+                  <button className="button button-oauth" type="button" onClick={() => startGithub("register")} disabled={busy || !termsAccepted || !privacyAccepted}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 授权登录 / 新用户自动注册</button>
                   <p className="form-foot">还没有账户？ <button type="button" className="text-button" onClick={() => switchMode("register")}>立即注册</button></p>
                 </form>
               )}
