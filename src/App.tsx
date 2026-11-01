@@ -192,7 +192,7 @@ export default function App() {
           })
         : await request("/auth/email/verification/send", { email });
 
-      setNotice(result.message || (codeSent ? "验证码已重新发送，请查收邮箱。" : "验证码已发送，请查收邮箱。"));
+      setNotice("发送成功，请去邮箱查看");
       setCodeSent(true);
       setCountdown(60);
     } catch (err) {
