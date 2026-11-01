@@ -195,7 +195,7 @@ export default function App() {
           <img className="brand-mark" src="/logo.svg" alt="" />
           <span>Domain<span className="brand-light">Hub</span></span>
         </a>
-        <span className="topbar-note">域名与 DNS 管理平台</span>
+        <span className="topbar-note">{TEST_ENV ? "测试环境 · 独立测试数据" : "域名与 DNS 管理平台"}</span>
       </header>
 
       <section className="auth-layout">
