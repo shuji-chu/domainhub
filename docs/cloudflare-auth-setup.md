@@ -59,4 +59,4 @@ npx wrangler deploy --config workers/api/wrangler.toml
 npx wrangler d1 migrations apply domainhub-db --remote --config workers/api/wrangler.toml
 ```
 
-本次新增迁移：`0003_github_login_codes.sql`。生产 D1 已应用该迁移。
+本次新增迁移：`0003_github_login_codes.sql`（GitHub OAuth 一次性登录码）和 `0004_legal_consents.sql`（用户协议/隐私政策同意记录）。部署本分支后，先执行 `npx wrangler d1 migrations apply domainhub-db --remote --config workers/api/wrangler.toml`，再开放注册。注册接口要求 `termsAccepted=true`、`privacyAccepted=true`，并将协议版本 `1.0` 与接受时间写入 D1。
