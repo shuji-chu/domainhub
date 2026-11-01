@@ -23,12 +23,20 @@ export default function App() {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [signedIn, setSignedIn] = useState<{ email: string; quota: number } | null>(null);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = window.setInterval(() => setCountdown(value => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [countdown > 0]);
 
   useEffect(() => {
     const savedToken = sessionStorage.getItem("domainhub_token");
@@ -97,17 +105,45 @@ export default function App() {
 
   async function handleRegister(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!codeSent || code.length !== 6 || !termsAccepted || !privacyAccepted) return;
     setBusy(true); setError(""); setNotice("");
     try {
-      const result = await request("/auth/register", {
-        email, password, displayName, termsAccepted, privacyAccepted,
-        termsVersion: "1.0", privacyVersion: "1.0",
-      });
-      setNotice(result.message || "请检查邮箱并完成验证。");
-      setCode("");
-      setMode("verify");
+      const result = await request("/auth/email/verify", { email, code });
+      setNotice(result.message || "邮箱验证成功，请登录。");
+      setCode(""); setCodeSent(false); setCountdown(0);
+      setPassword("");
+      setMode("login");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "注册失败");
+      setError(err instanceof Error ? err.message : "验证码错误或已过期");
+    } finally { setBusy(false); }
+  }
+
+  async function handleGetCode() {
+    if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      setError("请先填写有效的邮箱地址。"); return;
+    }
+    if (password.length < 12 || password.length > 128) {
+      setError("密码长度必须为 12 至 128 位。"); return;
+    }
+    if (!termsAccepted || !privacyAccepted) {
+      setError("请先阅读并同意用户服务协议和隐私政策。"); return;
+    }
+    setBusy(true); setError(""); setNotice("");
+    try {
+      if (!codeSent) {
+        const result = await request("/auth/register", {
+          email, password, displayName, termsAccepted, privacyAccepted,
+          termsVersion: "1.0", privacyVersion: "1.0",
+        });
+        setCodeSent(true);
+        setNotice(result.message || "验证码已发送，请查收邮箱。");
+      } else {
+        const result = await request("/auth/email/verification/send", { email });
+        setNotice(result.message || "验证码已重新发送。");
+      }
+      setCountdown(60);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "验证码发送失败");
     } finally { setBusy(false); }
   }
 
@@ -152,15 +188,15 @@ export default function App() {
       <div className="ambient ambient-two" />
       <header className="topbar">
         <a className="brand" href="/" aria-label="DomainHub 首页">
-          <span className="brand-mark">D</span>
+          <img className="brand-mark" src="/logo.svg" alt="" />
           <span>Domain<span className="brand-light">Hub</span></span>
         </a>
-        <span className="topbar-note">DOMAIN MANAGEMENT PLATFORM</span>
+        <span className="topbar-note">域名与 DNS 管理平台</span>
       </header>
 
       <section className="auth-layout">
         <div className="intro">
-          <div className="eyebrow"><span /> DOMAIN INFRASTRUCTURE, SIMPLIFIED</div>
+          <div className="eyebrow"><span /> 简洁 · 安全 · 可控</div>
           <h1>你的域名，<br /><span>由你掌控。</span></h1>
           <p>在一个清晰、可靠的工作空间中管理域名与 DNS。安全登录，从这里开始。</p>
           <div className="intro-points">
@@ -168,14 +204,14 @@ export default function App() {
             <div><i>02</i><span><b>账户安全</b><small>邮箱验证与安全会话保护</small></span></div>
             <div><i>03</i><span><b>清晰可控</b><small>每项操作都由你主动发起</small></span></div>
           </div>
-          <div className="intro-foot"><span className="status-dot" /> DOMAINHUB ACCOUNT GATEWAY</div>
+          <div className="intro-foot"><span className="status-dot" /> 账户安全入口</div>
         </div>
 
         <section className="auth-card" aria-labelledby="auth-title">
           {signedIn ? (
             <div className="success-state">
               <div className="success-icon">✓</div>
-              <p className="card-kicker">AUTHENTICATION COMPLETE</p>
+              <p className="card-kicker">身份验证完成</p>
               <h2 id="auth-title">登录成功</h2>
               <p className="muted">当前已通过身份验证。</p>
               <div className="account-summary"><span>账户邮箱</span><b>{signedIn.email}</b><span>当前配额</span><b>{signedIn.quota}</b></div>
@@ -184,7 +220,7 @@ export default function App() {
           ) : (
             <>
               <div className="card-heading">
-                <p className="card-kicker">WELCOME TO DOMAINHUB</p>
+                <p className="card-kicker">欢迎使用 DomainHub</p>
                 <h2 id="auth-title">{mode === "register" ? "创建账户" : mode === "verify" ? "验证邮箱" : "欢迎回来"}</h2>
                 <p>{mode === "register" ? "填写信息，开启你的域名管理空间。" : mode === "verify" ? "输入发送到邮箱的 6 位验证码。" : "登录你的账户以继续使用 DomainHub。"}</p>
               </div>
@@ -211,7 +247,7 @@ export default function App() {
 
               {mode === "register" && (
                 <form onSubmit={handleRegister} className="auth-form">
-                  <label>显示名称 <span className="optional">选填</span><input autoComplete="nickname" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="你希望如何称呼你" maxLength={60} /></label>
+                  <label>显示名称 <span className="optional">选填</span><input autoComplete="nickname" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="你希望如何称呼你" maxLength={60} disabled={codeSent} /></label>
                   <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
                   <label>设置密码<input type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} placeholder="至少 12 位，最多 128 位" /></label>
                   <div className="consents">
@@ -238,7 +274,7 @@ export default function App() {
         </section>
       </section>
 
-      <footer className="site-footer"><span>© {new Date().getFullYear()} DOMAINHUB</span><span>SECURE ACCESS · PRIVATE BY DESIGN</span></footer>
+      <footer className="site-footer"><span>© {new Date().getFullYear()} DomainHub</span><span>安全 · 简洁 · 自主掌控</span></footer>
     </main>
   );
 }
