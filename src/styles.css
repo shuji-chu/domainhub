@@ -287,3 +287,40 @@ button:focus-visible, a:focus-visible { outline: 2px solid #67c9ff; outline-offs
   .home-nav .quota-chip { padding: 7px 7px; }
   .home-nav .nav-button { padding: 0 8px; }
 }
+
+/* Mandatory first-visit auth screen uses the same dark grid/blue-glow backdrop */
+.auth-overlay {
+  background-color: #07090e;
+  background-image:
+    radial-gradient(ellipse at 50% -12%, rgba(31, 112, 190, .22), transparent 43%),
+    radial-gradient(ellipse at 92% 82%, rgba(9, 145, 163, .09), transparent 32%),
+    linear-gradient(rgba(148, 163, 184, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, .035) 1px, transparent 1px);
+  background-size: auto, auto, 42px 42px, 42px 42px;
+  backdrop-filter: none;
+}
+.auth-overlay::before,
+.auth-overlay::after {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  border: 1px solid rgba(64, 166, 255, .12);
+  border-radius: 50%;
+}
+.auth-overlay::before {
+  width: 620px;
+  height: 620px;
+  left: -390px;
+  top: 24%;
+  box-shadow: 0 0 0 65px rgba(22,103,174,.04), 0 0 0 130px rgba(22,103,174,.025);
+}
+.auth-overlay::after {
+  width: 780px;
+  height: 780px;
+  right: -570px;
+  top: -300px;
+  box-shadow: 0 0 0 70px rgba(22,103,174,.04), 0 0 0 140px rgba(22,103,174,.025);
+}
+.auth-overlay > .flex,
+.auth-overlay .auth-modal { position: relative; z-index: 1; }
