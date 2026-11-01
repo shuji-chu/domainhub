@@ -72,7 +72,8 @@ export default {async fetch(req,env){
    const url=new URL("https://api.digitalocean.com/v2/droplets");url.searchParams.set("tag_name","domainhub-user-"+u.id);url.searchParams.set("per_page","200");
    const upstream=await fetch(url,{headers}),payload=await upstream.json().catch(()=>({}));
    if(!upstream.ok)return respond({error:payload?.message||"获取服务器用量失败"},upstream.status);
-   const now=Date.now(),droplets=(payload.droplets||[]).map(d=>{const monthly=Number(d.size?.price_monthly||0),created=Date.parse(d.created_at||"");const hours=Number.isFinite(created)&&created>0?Math.max(0,(now-created)/3600000):0;return {id:d.id,name:d.name,status:d.status,created_at:d.created_at,monthly_price:monthly,hourly_estimate:monthly/730,elapsed_hours:hours,estimated_cost:monthly/730*hours,currency:"USD"}});
+   const sizeResponse=await fetch("https://api.digitalocean.com/v2/sizes?per_page=200",{headers}),sizePayload=await sizeResponse.json().catch(()=>({})),sizePrices=new Map((sizePayload.sizes||[]).map(x=>[x.slug,Number(x.price_monthly||0)]));
+   const now=Date.now(),droplets=(payload.droplets||[]).map(d=>{const monthly=Number(sizePrices.get(d.size_slug)||0),created=Date.parse(d.created_at||"");const hours=Number.isFinite(created)&&created>0?Math.max(0,(now-created)/3600000):0;return {id:d.id,name:d.name,status:d.status,created_at:d.created_at,monthly_price:monthly,hourly_estimate:monthly/730,elapsed_hours:hours,estimated_cost:monthly/730*hours,currency:"USD"}});
    const events=await env.DB.prepare("SELECT id,droplet_id,action,status,details,created_at FROM server_usage_events WHERE user_id=? ORDER BY created_at DESC LIMIT 200").bind(u.id).all();
    return respond({ok:true,disclaimer:"以下为按 DigitalOcean 当前规格月价和创建后时长计算的估算，不是 DigitalOcean 实际账单；停机计费规则、快照、备份、流量和税费可能导致实际金额不同。",servers:droplets,events:events.results||[]});
   }
