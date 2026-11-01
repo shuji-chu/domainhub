@@ -1,7 +1,7 @@
 const ALLOWED_ORIGINS=new Set(["https://dns.lynli.me","https://c86f58b3.domainhub-frontend.pages.dev","https://domainhub-frontend.pages.dev","https://2839aaa8.domainhub-admin-ui.pages.dev","https://domainhub-admin-ui.pages.dev","https://admin.lynli.me"]);
 const ADMIN_EMAIL="boss@lynli.me";
 const DNSHE_BASE="https://api005.dnshe.com/index.php?m=dns";
-const corsFor=origin=>({"Access-Control-Allow-Origin":origin||"https://dns.lynli.me","Access-Control-Allow-Credentials":"true","Access-Control-Allow-Headers":"Content-Type, Authorization","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Vary":"Origin"});
+const corsFor=origin=>({"Access-Control-Allow-Origin":origin||"https://dns.lynli.me","Access-Control-Allow-Credentials":"true","Access-Control-Allow-Headers":"Content-Type, Authorization","Access-Control-Allow-Methods":"GET, POST, PATCH, DELETE, OPTIONS","Vary":"Origin"});
 const json=(data,status=200,origin)=>new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8",...corsFor(origin)}});
 const b64=v=>btoa(String.fromCharCode(...new Uint8Array(v))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const unb64=s=>Uint8Array.from(atob(String(s).replace(/-/g,"+").replace(/_/g,"/")+"===".slice((String(s).length+3)%4)),c=>c.charCodeAt(0));
@@ -60,8 +60,53 @@ export default {async fetch(req,env){
   if(path==="/domains"&&req.method==="GET"){const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);const {results=[]}=await env.DB.prepare("SELECT id,domain,status FROM domain_inventory WHERE status='available' AND COALESCE(is_test,0)=0 ORDER BY domain LIMIT 200").all();return respond({ok:true,domains:results,quota:await quotaOf(env,u.id)})}
   if(path==="/domains/mine"&&req.method==="GET"){const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);const {results=[]}=await env.DB.prepare("SELECT id,domain,dnshe_zone_id,claimed_at,status FROM user_domains WHERE user_id=? ORDER BY claimed_at DESC").bind(u.id).all();return respond({ok:true,domains:results,quota:await quotaOf(env,u.id)})}
   if(path==="/domains/claim"&&req.method==="POST"){const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);if(u.status!=="active")return respond({error:"账户已停用"},403);const b=await req.json(),id=String(b.inventoryId||"");if(!id)return respond({error:"缺少域名库存编号"},400);const inv=await env.DB.prepare("SELECT * FROM domain_inventory WHERE id=? AND status='available' AND COALESCE(is_test,0)=0").bind(id).first();if(!inv)return respond({error:"该域名已被领取、不存在或为测试库存"},409);const uid=crypto.randomUUID(),now=new Date().toISOString();const results=await env.DB.batch([env.DB.prepare("UPDATE domain_inventory SET status='claimed',updated_at=? WHERE id=? AND status='available' AND EXISTS(SELECT 1 FROM quota_ledger WHERE user_id=? GROUP BY user_id HAVING SUM(delta)>0)").bind(now,id,u.id),env.DB.prepare("INSERT INTO user_domains(id,user_id,inventory_id,domain,dnshe_zone_id,claimed_at,status) SELECT ?,?,?,?,? ,?,'active' WHERE changes()=1").bind(uid,u.id,id,inv.domain,inv.zone_id,now),env.DB.prepare("INSERT INTO quota_ledger(id,user_id,delta,source_type,idempotency_key,reason,created_at) SELECT ?,?,-1,'domain_claim',?,?,? WHERE EXISTS(SELECT 1 FROM user_domains WHERE id=?)").bind(crypto.randomUUID(),u.id,"claim:"+uid,"领取域名 "+inv.domain,now,uid)]);if(!results?.[1]?.meta?.changes)return respond({error:await quotaOf(env,u.id)<1?"配额不足":"域名已被其他用户领取"},409);return respond({ok:true,domain:{id:uid,domain:inv.domain},quota:await quotaOf(env,u.id)})}
-  if(path==="/dns/records"&&req.method==="GET"){const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);const zoneId=new URL(req.url).searchParams.get("zoneId")||"";const owned=await env.DB.prepare("SELECT ud.id,ud.domain,ud.dnshe_zone_id FROM user_domains ud JOIN domain_inventory di ON di.id=ud.inventory_id WHERE ud.user_id=? AND ud.dnshe_zone_id=? AND ud.status='active' AND COALESCE(di.is_test,0)=0").bind(u.id,zoneId).first();if(!owned)return respond({error:"无权管理此域名"},403);const data=await dnshe(env,"/zones/"+encodeURIComponent(zoneId)+"/records");return respond({ok:true,records:data?.data?.records||data?.records||[],domain:owned.domain})}
-  if(path==="/dns/records"&&req.method==="POST"){const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);const b=await req.json(),zoneId=String(b.zoneId||""),type=String(b.type||"").toUpperCase(),name=String(b.name||"@").trim(),value=String(b.value||"").trim(),ttl=Number(b.ttl||600);if(!["A","CNAME"].includes(type))return respond({error:"仅支持 A 或 CNAME 记录"},400);if(!name||!value||!Number.isInteger(ttl)||(ttl!==0&&(ttl<60||ttl>86400)))return respond({error:"记录参数无效"},400);if(type==="A"&&!/^\d{1,3}(\.\d{1,3}){3}$/.test(value))return respond({error:"A 记录必须填写 IPv4 地址"},400);if(type==="CNAME"&&!/^(?=.{1,253}$)[a-z0-9.-]+$/i.test(value))return respond({error:"CNAME 记录值无效"},400);const owned=await env.DB.prepare("SELECT ud.domain FROM user_domains ud JOIN domain_inventory di ON di.id=ud.inventory_id WHERE ud.user_id=? AND ud.dnshe_zone_id=? AND ud.status='active' AND COALESCE(di.is_test,0)=0").bind(u.id,zoneId).first();if(!owned)return respond({error:"无权管理此域名"},403);const data=await dnshe(env,"/zones/"+encodeURIComponent(zoneId)+"/records","POST",{name,type,value,ttl,line:"default",enabled:true});return respond({ok:true,record:data?.data?.record||data?.record||data,domain:owned.domain},201)}
+  if(path==="/dns/records"&&req.method==="GET"){const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);const zoneId=new URL(req.url).searchParams.get("zoneId")||"";const owned=await env.DB.prepare("SELECT ud.id,ud.domain,ud.dnshe_zone_id FROM user_domains ud JOIN domain_inventory di ON di.id=ud.inventory_id WHERE ud.user_id=? AND ud.dnshe_zone_id=? AND ud.status='active' AND COALESCE(di.is_test,0)=0").bind(u.id,zoneId).first();if(!owned)return respond({error:"无权管理此域名"},403);const data=await dnshe(env,"/zones/"+encodeURIComponent(zoneId)+"/records?per_page=100");return respond({ok:true,records:data?.data?.records||data?.records||[],domain:owned.domain})}
+  if(path==="/dns/records"&&req.method==="POST"){
+   const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);
+   const b=await req.json(),zoneId=String(b.zoneId||""),type=String(b.type||"").toUpperCase(),name=String(b.name||"@").trim(),value=String(b.value||"").trim(),ttl=Number(b.ttl??600);
+   if(!["A","AAAA","CNAME","MX","TXT","SRV","CAA"].includes(type))return respond({error:"不支持的 DNS 记录类型"},400);
+   if(!name||name.length>253||!value||!Number.isInteger(ttl)||(ttl!==0&&(ttl<60||ttl>86400)))return respond({error:"记录参数无效"},400);
+   if(type==="A"&&(!/^\\d{1,3}(\\.\\d{1,3}){3}$/.test(value)||value.split(".").some(x=>Number(x)>255)))return respond({error:"A 记录必须填写有效 IPv4 地址"},400);
+   if(type==="AAAA"&&(!value.includes(":")||!/^[0-9a-f:]+$/i.test(value)))return respond({error:"AAAA 记录必须填写有效 IPv6 地址"},400);
+   if(type==="CNAME"&&!/^(?=.{1,253}$)[a-z0-9.-]+$/i.test(value))return respond({error:"CNAME 记录值无效"},400);
+   if(type==="TXT"&&(value.length>2048||/[\\r\\n\\0]/.test(value)))return respond({error:"TXT 记录不能超过 2048 字符或包含换行"},400);
+   if(type==="MX"&&!/^\\d{1,5}\\s+[^\\s]+$/.test(value))return respond({error:"MX 记录格式应为“优先级 邮件服务器”"},400);
+   if(type==="SRV"&&!/^\\d{1,5}\\s+\\d{1,5}\\s+\\d{1,5}\\s+[^\\s]+$/.test(value))return respond({error:"SRV 记录格式应为“优先级 权重 端口 目标”"},400);
+   if(type==="CAA"&&!/^\\d{1,3}\\s+[^\\s]+\\s+.+$/.test(value))return respond({error:"CAA 记录格式应为“标志 标签 值”"},400);
+   const owned=await env.DB.prepare("SELECT ud.domain FROM user_domains ud JOIN domain_inventory di ON di.id=ud.inventory_id WHERE ud.user_id=? AND ud.dnshe_zone_id=? AND ud.status='active' AND COALESCE(di.is_test,0)=0").bind(u.id,zoneId).first();
+   if(!owned)return respond({error:"无权管理此域名"},403);
+   const data=await dnshe(env,"/zones/"+encodeURIComponent(zoneId)+"/records","POST",{name,type,value,ttl,line:String(b.line||"default"),enabled:b.enabled!==false,remark:String(b.remark||"").slice(0,255)});
+   return respond({ok:true,record:data?.data?.record||data?.record||data,domain:owned.domain},201)
+  }
+  if(path==="/dns/records"&&req.method==="PATCH"){
+   const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);
+   const b=await req.json(),zoneId=String(b.zoneId||""),recordId=String(b.recordId||""),type=String(b.type||"").toUpperCase(),name=String(b.name||"@").trim(),value=String(b.value||"").trim(),ttl=Number(b.ttl??600);
+   if(!/^\\d{12}$/.test(recordId))return respond({error:"DNS 记录编号无效"},400);
+   if(!["A","AAAA","CNAME","MX","TXT","SRV","CAA"].includes(type))return respond({error:"不支持的 DNS 记录类型"},400);
+   if(!name||name.length>253||!value||!Number.isInteger(ttl)||(ttl!==0&&(ttl<60||ttl>86400)))return respond({error:"记录参数无效"},400);
+   if(type==="A"&&(!/^\\d{1,3}(\\.\\d{1,3}){3}$/.test(value)||value.split(".").some(x=>Number(x)>255)))return respond({error:"A 记录必须填写有效 IPv4 地址"},400);
+   if(type==="AAAA"&&(!value.includes(":")||!/^[0-9a-f:]+$/i.test(value)))return respond({error:"AAAA 记录必须填写有效 IPv6 地址"},400);
+   if(type==="CNAME"&&!/^(?=.{1,253}$)[a-z0-9.-]+$/i.test(value))return respond({error:"CNAME 记录值无效"},400);
+   if(type==="TXT"&&(value.length>2048||/[\\r\\n\\0]/.test(value)))return respond({error:"TXT 记录不能超过 2048 字符或包含换行"},400);
+   if(type==="MX"&&!/^\\d{1,5}\\s+[^\\s]+$/.test(value))return respond({error:"MX 记录格式应为“优先级 邮件服务器”"},400);
+   if(type==="SRV"&&!/^\\d{1,5}\\s+\\d{1,5}\\s+\\d{1,5}\\s+[^\\s]+$/.test(value))return respond({error:"SRV 记录格式应为“优先级 权重 端口 目标”"},400);
+   if(type==="CAA"&&!/^\\d{1,3}\\s+[^\\s]+\\s+.+$/.test(value))return respond({error:"CAA 记录格式应为“标志 标签 值”"},400);
+   const owned=await env.DB.prepare("SELECT ud.domain FROM user_domains ud JOIN domain_inventory di ON di.id=ud.inventory_id WHERE ud.user_id=? AND ud.dnshe_zone_id=? AND ud.status='active' AND COALESCE(di.is_test,0)=0").bind(u.id,zoneId).first();
+   if(!owned)return respond({error:"无权管理此域名"},403);
+   const patch={name,type,value,ttl,line:String(b.line||"default"),enabled:b.enabled!==false};
+   if(b.remark!==undefined)patch.remark=String(b.remark).slice(0,255);
+   const data=await dnshe(env,"/zones/"+encodeURIComponent(zoneId)+"/records/"+encodeURIComponent(recordId),"PATCH",patch);
+   return respond({ok:true,record:data?.data?.record||data?.record||data,domain:owned.domain})
+  }
+  if(path==="/dns/records"&&req.method==="DELETE"){
+   const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);
+   const b=await req.json(),zoneId=String(b.zoneId||""),recordId=String(b.recordId||"");
+   if(!/^\\d{12}$/.test(recordId))return respond({error:"DNS 记录编号无效"},400);
+   const owned=await env.DB.prepare("SELECT ud.domain FROM user_domains ud JOIN domain_inventory di ON di.id=ud.inventory_id WHERE ud.user_id=? AND ud.dnshe_zone_id=? AND ud.status='active' AND COALESCE(di.is_test,0)=0").bind(u.id,zoneId).first();
+   if(!owned)return respond({error:"无权管理此域名"},403);
+   const data=await dnshe(env,"/zones/"+encodeURIComponent(zoneId)+"/records/"+encodeURIComponent(recordId),"DELETE");
+   return respond({ok:true,deleted:true,domain:owned.domain,upstream:data?.data||data||null})
+  }
   if(path==="/api/servers/connection"&&req.method==="GET"){
    const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);
    if(!env.DIGITALOCEAN_TOKEN)return respond({ok:true,configured:false,connected:false,message:"尚未配置 DigitalOcean Token"});
@@ -121,7 +166,25 @@ export default {async fetch(req,env){
   if(path==="/admin/users"&&req.method==="GET"){const a=await admin(req,env);if(!a)return respond({error:"admin_only"},403);const {results=[]}=await env.DB.prepare("SELECT u.id,u.email,u.display_name,u.status,u.created_at,COALESCE(q.quota,0) AS quota FROM users u LEFT JOIN (SELECT user_id,SUM(delta) quota FROM quota_ledger GROUP BY user_id) q ON q.user_id=u.id WHERE u.deleted_at IS NULL ORDER BY u.created_at DESC LIMIT 500").all();return respond({ok:true,users:results})}
   if(path==="/admin/users/quota"&&req.method==="POST"){const a=await admin(req,env);if(!a)return respond({error:"admin_only"},403);const b=await req.json(),userId=String(b.userId||""),delta=Number(b.delta),reason=String(b.reason||"管理员调整");if(!userId||!Number.isInteger(delta)||delta===0||Math.abs(delta)>10000)return respond({error:"配额调整参数无效"},400);const current=await quotaOf(env,userId);if(current+delta<0)return respond({error:"配额不能扣成负数"},400);await env.DB.prepare("INSERT INTO quota_ledger(id,user_id,delta,source_type,idempotency_key,related_user_id,reason) VALUES(?,?,'"+(delta>0?delta:delta)+"','admin_adjustment',?,?,?)").bind(crypto.randomUUID(),userId,"admin:"+crypto.randomUUID(),a.id,reason).run();return respond({ok:true,quota:await quotaOf(env,userId)})}
   if(path==="/admin/users/status"&&req.method==="POST"){const a=await admin(req,env);if(!a)return respond({error:"admin_only"},403);const b=await req.json(),userId=String(b.userId||""),status=b.status==="suspended"?"suspended":"active";if(!userId)return respond({error:"缺少用户编号"},400);await env.DB.prepare("UPDATE users SET status=?,updated_at=? WHERE id=?").bind(status,new Date().toISOString(),userId).run();if(status==="suspended")await env.DB.prepare("UPDATE sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL").bind(new Date().toISOString(),userId).run();return respond({ok:true,status})}
-  if(path==="/admin/inventory/sync"&&req.method==="POST"){const a=await admin(req,env);if(!a)return respond({error:"admin_only"},403);const data=await dnshe(env,"/zones?page=1&per_page=100");const zones=data?.data?.zones||data?.zones||[];let count=0;for(const z of zones){const zoneId=String(z.id||z.zone_id||""),domain=String(z.zone_name||z.name||z.domain||"").toLowerCase();if(!zoneId||!domain)continue;await env.DB.prepare("INSERT INTO domain_inventory(id,zone_id,domain,status,source,is_test) VALUES(?,?,?,'available','dnshe',0) ON CONFLICT(zone_id) DO UPDATE SET domain=excluded.domain,updated_at=CURRENT_TIMESTAMP,is_test=0").bind(crypto.randomUUID(),zoneId,domain).run();count++}return respond({ok:true,synced:count})}
+  if(path==="/admin/inventory/sync"&&req.method==="POST"){
+   const a=await admin(req,env);if(!a)return respond({error:"admin_only"},403);
+   let page=1,count=0,pages=1;
+   while(page<=100&&page<=pages){
+    const data=await dnshe(env,"/zones?page="+page+"&per_page=100");
+    const zones=data?.data?.zones||data?.zones||[];
+    const meta=data?.data?.meta||data?.meta||{};
+    pages=Math.max(1,Math.min(100,Number(meta.total_pages||pages||1)));
+    for(const z of zones){
+     const zoneId=String(z.id||z.zone_id||""),domain=String(z.zone_name||z.name||z.domain||"").toLowerCase();
+     if(!zoneId||!domain)continue;
+     await env.DB.prepare("INSERT INTO domain_inventory(id,zone_id,domain,status,source,is_test) VALUES(?,?,?,'available','dnshe',0) ON CONFLICT(zone_id) DO UPDATE SET domain=excluded.domain,updated_at=CURRENT_TIMESTAMP,is_test=0").bind(crypto.randomUUID(),zoneId,domain).run();
+     count++;
+    }
+    if(!zones.length||(zones.length<100&&!meta.total_pages))break;
+    page++;
+   }
+   return respond({ok:true,synced:count,pages:page-1})
+  }
   if(path==="/admin/inventory"&&req.method==="GET"){const a=await admin(req,env);if(!a)return respond({error:"admin_only"},403);const {results=[]}=await env.DB.prepare("SELECT id,zone_id,domain,status,source,is_test,created_at FROM domain_inventory ORDER BY domain LIMIT 500").all();return respond({ok:true,domains:results})}
   return respond({error:"not_found"},404)
  }catch(e){const status=Number(e?.status)||500;return respond({error:status===429?"rate_limited":"internal_error",message:String(e?.message||e)},status)}
