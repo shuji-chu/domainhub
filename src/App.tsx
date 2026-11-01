@@ -5,7 +5,7 @@ import "./styles.css";
 const API = "https://domainhub-api.chulingli1988.workers.dev";
 const TOKEN_KEY = "domainhub_token";
 type Mode = "login" | "register" | "verify";
-type ApiResult = { ok?: boolean; message?: string; error?: string; testMode?: boolean; verificationCode?: string; token?: string; quota?: number; user?: { id: string; email: string; displayName?: string | null; quota?: number }; domains?: Array<{id:string;domain:string;status?:string}> };
+type ApiResult = { ok?: boolean; message?: string; error?: string; token?: string; quota?: number; user?: { id: string; email: string; displayName?: string | null; quota?: number }; domains?: Array<{id:string;domain:string;status?:string}> };
 
 async function request(path: string, body: Record<string, unknown>): Promise<ApiResult> {
   const response = await fetch(API + path, {
@@ -25,7 +25,6 @@ export default function App() {
   const [displayName, setDisplayName] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
-  const [testVerificationCode, setTestVerificationCode] = useState("");
   const [countdown, setCountdown] = useState(0);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -167,7 +166,7 @@ export default function App() {
       setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
       setAuthOpen(false);
       setNotice(result.message || "注册成功，已自动登录");
-      setCode(""); setCodeSent(false); setTestVerificationCode(""); setCountdown(0);
+      setCode(""); setCodeSent(false);  setCountdown(0);
       setPassword("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "验证码错误或已过期");
@@ -193,17 +192,7 @@ export default function App() {
           })
         : await request("/auth/email/verification/send", { email });
 
-      if (result.testMode && !result.verificationCode) {
-        throw new Error("测试通道没有返回验证码，请重试；邮箱和密码尚未锁定。");
-      }
-      if (result.verificationCode) {
-        setTestVerificationCode(result.verificationCode);
-        setCode(result.verificationCode);
-        setNotice("测试验证码已生成，已显示在下方，可直接提交注册。");
-      } else {
-        setTestVerificationCode("");
-        setNotice(result.message || (codeSent ? "验证码已重新发送，请查收邮箱。" : "验证码已发送，请查收邮箱。"));
-      }
+      setNotice(result.message || (codeSent ? "验证码已重新发送，请查收邮箱。" : "验证码已发送，请查收邮箱。"));
       setCodeSent(true);
       setCountdown(60);
     } catch (err) {
@@ -229,15 +218,7 @@ export default function App() {
     setBusy(true); setError(""); setNotice("");
     try {
       const result = await request("/auth/email/verification/send", { email });
-      if (result.testMode && !result.verificationCode) throw new Error("测试通道没有返回验证码，请稍后重试。");
-      if (result.verificationCode) {
-        setTestVerificationCode(result.verificationCode);
-        setCode(result.verificationCode);
-        setNotice("新的测试验证码已显示在页面中。");
-      } else {
-        setTestVerificationCode("");
-        setNotice(result.message || "如果该邮箱对应待验证账户，我们会发送验证邮件。");
-      }
+      setNotice(result.message || "如果该邮箱对应待验证账户，我们会发送验证邮件。");
     } catch (err) {
       setError(err instanceof Error ? err.message : "发送失败");
     } finally { setBusy(false); }
@@ -356,23 +337,7 @@ export default function App() {
                     <label>邮箱验证码<input className="code-input" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="输入 6 位验证码" /></label>
                     <button className="button button-code" type="button" onClick={() => void handleGetCode()} disabled={busy || countdown > 0 || !email || !password || !termsAccepted || !privacyAccepted}>{busy ? "发送中…" : countdown > 0 ? `${countdown} 秒后重发` : codeSent ? "重新获取" : "获取验证码"}</button>
                   </div>
-                  {testVerificationCode && (
-                    <div className="test-code-panel" role="status" aria-live="polite">
-                      <span>你的邮箱验证码 · 10 分钟有效</span>
-                      <strong>{testVerificationCode}</strong>
-                      <button
-                        className="test-code-copy"
-                        type="button"
-                        onClick={() => {
-                          void navigator.clipboard.writeText(testVerificationCode)
-                            .then(() => setNotice("验证码已复制，也已自动填入输入框。"))
-                            .catch(() => setError("复制失败，请长按上方 6 位验证码复制。"));
-                        }}
-                      >一键复制验证码</button>
-                      <p>验证码已自动填入上方输入框，可直接点击“创建账户”。</p>
-                    </div>
-                  )}
-                  <p className="hint">{testVerificationCode ? "测试验证码已在上方显示并自动填入，有效期 10 分钟；确认信息后可直接创建账户。" : codeSent ? "验证码已发送至邮箱，有效期 10 分钟；邮箱、密码和显示名称已锁定。" : "请先填写邮箱和密码，并勾选下方协议后获取验证码。"}</p>
+                  <p className="hint">{codeSent ? "验证码已发送至邮箱，有效期 10 分钟；邮箱、密码和显示名称已锁定。" : "请先填写邮箱和密码，并勾选下方协议后获取验证码。"}</p>
                   <div className="consents">
                     <label className="check-row"><input type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} disabled={codeSent} /><span>我已阅读并同意 <a href="#terms">用户服务协议</a></span></label>
                     <label className="check-row"><input type="checkbox" checked={privacyAccepted} onChange={e => setPrivacyAccepted(e.target.checked)} disabled={codeSent} /><span>我已阅读并同意 <a href="#privacy">隐私政策</a></span></label>
