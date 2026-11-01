@@ -28,7 +28,7 @@ const spaceshipRequest=async(env,path,method="GET",body)=>{
  if(!response.ok){const detail=String(data.detail||data.message||data.title||data.error||"Spaceship API 请求失败（HTTP "+response.status+"）");const err=Object.assign(new Error(detail),{status:response.status,providerStatus:response.status,providerData:data});throw err}
  return {data,headers:response.headers,status:response.status};
 };
-const validateTldDomain=value=>{const domain=String(value||"").trim().toLowerCase().replace(/\\.$/,"");if(domain.length>253||!/^(?=.{3,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$/.test(domain))throw Object.assign(new Error("请输入完整有效的域名，例如 myname.com"),{status:400});return domain};
+const validateTldDomain=value=>{const domain=String(value||"").trim().toLowerCase().replace(/\.$/,"");if(domain.length>253||!/^(?=.{3,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain))throw Object.assign(new Error("请输入完整有效的域名，例如 myname.com"),{status:400});return domain};
 const registrarErrorMessage=err=>{const raw=String(err?.message||"注册商拒绝了本次注册请求");if(/insufficient|not enough|low balance|balance|credit|funds|payment method/i.test(raw))return "注册商余额不足，请等待站长充值。注册商返回："+raw;return "下单失败："+raw};
 async function sendMail(env,to,subject,html,text){
  if(!env.RESEND_API_KEY||!env.RESEND_FROM_EMAIL)throw Object.assign(new Error("邮件服务尚未配置"),{status:503});
@@ -123,18 +123,6 @@ const loginCode=b64(random()),expires=new Date(Date.now()+60000).toISOString();a
     await env.DB.prepare("UPDATE tld_orders SET status='failed',provider_error=?,provider_status=?,updated_at=? WHERE id=?").bind(message,e.providerStatus||status,new Date().toISOString(),orderId).run();
     return respond({ok:false,error:message,order_no:orderNo,provider_status:e.providerStatus||status,code:e.code||"SPACESHIP_REGISTER_FAILED"},502);
    }
-  }
-);if(!u)return respond({error:"请先登录后再购买顶级域名"},401);
-   if(u.status!=="active")return respond({error:"账户已停用"},403);
-   const b=await req.json(),domain=String(b.domain||"").trim().toLowerCase().replace(/\.$/,"");
-   if(domain.length>253||! /^(?=.{3,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain))return respond({error:"域名格式无效"},400);
-   const tld=domain.split(".").pop(),prices={com:12.99,net:14.99,org:13.99,io:39.99,co:29.99,me:19.99,dev:16.99,app:18.99,xyz:3.99,top:4.99,info:8.99,biz:11.99,online:5.99,site:4.99,store:8.99};
-   if(!Object.prototype.hasOwnProperty.call(prices,tld))return respond({error:"暂不支持该域名后缀报价"},400);
-   const pending=await env.DB.prepare("SELECT order_no,domain,price_usdt,status,created_at FROM tld_orders WHERE user_id=? AND domain=? AND status='pending_payment'").bind(u.id,domain).first();
-   if(pending)return respond({ok:true,order:pending,reused:true,message:"已有该域名的待支付订单"});
-   const now=new Date().toISOString(),orderNo="DH"+Date.now().toString(36).toUpperCase()+b64(random(6)).slice(0,8).toUpperCase();
-   await env.DB.prepare("INSERT INTO tld_orders(id,order_no,user_id,domain,tld,price_usdt,currency,status,created_at,updated_at) VALUES(?,?,?,?,?,?,'USDT','pending_payment',?,?)").bind(crypto.randomUUID(),orderNo,u.id,domain,tld,prices[tld],now,now).run();
-   return respond({ok:true,order:{order_no:orderNo,domain,price_usdt:prices[tld],currency:"USDT",status:"pending_payment",created_at:now},message:"订单已创建，请使用 USDT 支付。"},201);
   }
   if(path==="/domains"&&req.method==="GET"){const u=await currentUser(req,env);const {results=[]}=await env.DB.prepare("SELECT id,domain,status FROM domain_inventory WHERE status='available' AND COALESCE(is_test,0)=0 ORDER BY domain LIMIT 200").all();return respond({ok:true,domains:results,...(u?{quota:await quotaOf(env,u.id)}:{})})}
   if(path==="/domains/mine"&&req.method==="GET"){const u=await currentUser(req,env);if(!u)return respond({error:"unauthorized"},401);const {results=[]}=await env.DB.prepare("SELECT id,domain,dnshe_zone_id,claimed_at,status FROM user_domains WHERE user_id=? ORDER BY claimed_at DESC").bind(u.id).all();return respond({ok:true,domains:results,quota:await quotaOf(env,u.id)})}
