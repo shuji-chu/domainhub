@@ -74,4 +74,5 @@ jobs:
           grep -q "CREATE TABLE IF NOT EXISTS oauth_login_codes" workers/api/migrations/0003_github_login_codes.sql
           grep -q "CREATE TABLE IF NOT EXISTS legal_consents" workers/api/migrations/0004_legal_consents.sql
           grep -q "CREATE TABLE IF NOT EXISTS server_usage_events" workers/api/migrations/0005_server_usage.sql
+          grep -q "CREATE TABLE IF NOT EXISTS server_instances" workers/api/migrations/0005_server_usage.sql
           grep -q "migrations_dir = \"migrations\"" workers/api/wrangler.toml
