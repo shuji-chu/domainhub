@@ -19,6 +19,7 @@ name = "domainhub-api-test"
 [env.test.vars]
 APP_ORIGIN = "https://dns.lynli.me"
 AUTH_OTP_TEST_MODE = "true"
+AUTH_TEST_EMAIL = "domainhub-test@example.com"
 
 [[env.test.d1_databases]]
 binding = "DB"
