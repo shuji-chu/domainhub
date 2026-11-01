@@ -70,3 +70,8 @@ button{cursor:pointer}
 .site-footer{display:flex;justify-content:space-between;gap:15px;padding:20px 0 25px;border-top:1px solid rgba(28,61,99,.08);font-size:9px;color:#9aa9b8}
 @media(max-width:760px){.auth-shell{padding:0 20px}.topbar{height:70px}.topbar-note{font-size:8px;letter-spacing:1px}.auth-layout{grid-template-columns:1fr;gap:32px;padding:42px 0 48px;max-width:440px}.intro h1{font-size:39px;letter-spacing:-1.8px;margin:18px 0 12px}.intro>p{font-size:13px}.intro-points{display:none}.intro-foot{margin-top:20px}.auth-card{padding:28px 23px 25px;border-radius:17px}.site-footer{font-size:8px;letter-spacing:1px}.ambient-one{left:-520px}.ambient-two{right:-680px}}
 @media(max-width:380px){.topbar-note{display:none}.auth-card{padding:25px 18px}.site-footer span:last-child{max-width:145px;text-align:right}}
+
+.button-oauth{color:#294765;background:#fff;border:1px solid #d9e4ef;box-shadow:0 3px 10px rgba(35,68,108,.06)}
+.button-oauth:hover:not(:disabled){background:#f7fbff;border-color:#9dbbd8}
+.github-mark{width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;background:#172b45;color:#fff;font-size:10px;line-height:1}
+@media(max-width:760px){.button-oauth{min-height:46px}}
