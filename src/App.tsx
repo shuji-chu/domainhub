@@ -1,89 +1,194 @@
-import{useEffect,useState}from'react';import type{FormEvent}from'react';import{Globe2,Search,LogIn,LogOut,RefreshCw,Mail,LockKeyhole,ShieldCheck,Github,ArrowRight,CheckCircle2}from'lucide-react';import'./styles.css';
-const API='https://domainhub-api.chulingli1988.workers.dev';
-type Server={id:number;name:string;status:string;region?:string;size?:string;ip:string|null;created_at?:string};
-type UsageEvent={id:string;droplet_id:number;action:string;status:string;details?:string|null;created_at:string};
-type UsageServer={id:number;name:string;status:string;created_at:string;monthly_price:number;hourly_estimate:number;elapsed_hours:number;estimated_cost:number;currency:string};
-function ServersPage({api,isAdmin}:{api:(path:string,init?:RequestInit)=>Promise<any>;isAdmin:boolean}){
- const[servers,setServers]=useState<Server[]>([]),[region,setRegion]=useState('nyc3'),[size,setSize]=useState('s-1vcpu-1gb'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[confirming,setConfirming]=useState(false),[pending,setPending]=useState<{id:number;action:string;name:string}|null>(null),[usage,setUsage]=useState<UsageServer[]>([]),[events,setEvents]=useState<UsageEvent[]>([]),[billing,setBilling]=useState<any[]>([]),[billingBalance,setBillingBalance]=useState<any>(null),[billingError,setBillingError]=useState(''),[disclaimer,setDisclaimer]=useState(''),[connection,setConnection]=useState<any>(null);
- const load=async()=>{setBusy(true);setError('');try{const c=await api('/api/servers/connection');setConnection(c);if(!c.connected){setServers([]);setUsage([]);setEvents([]);setBilling([]);setBillingBalance(null);setBillingError('');setDisclaimer('');return}const[d,u]=await Promise.all([api('/api/servers/list'),api('/api/servers/usage')]);setServers(d.droplets||[]);setUsage(u.servers||[]);setEvents(u.events||[]);setDisclaimer(u.disclaimer||'');if(isAdmin){try{const b=await api('/api/servers/billing');setBilling(b.billing_history||[]);setBillingBalance(b.balance||null);setBillingError('')}catch(e:any){setBilling([]);setBillingBalance(null);setBillingError(e.message||'无法读取 DigitalOcean 账单')}}else{setBilling([]);setBillingBalance(null);setBillingError('')}}catch(e:any){setError(e.message||'服务器数据加载失败')}finally{setBusy(false)}};
- useEffect(()=>{void load()},[]);
- const create=async()=>{setBusy(true);setError('');try{const d=await api('/api/servers/create',{method:'POST',body:JSON.stringify({name:'dh-'+Date.now().toString(36),region,size,image:'ubuntu-24-04-x64'})});setServers(v=>[d.droplet,...v]);await load()}catch(e:any){setError(e.message)}finally{setBusy(false)}};
- const runAction=async()=>{if(!pending)return;setBusy(true);setError('');try{await api('/api/servers/action',{method:'POST',body:JSON.stringify({id:pending.id,action:pending.action,image:'ubuntu-24-04-x64'})});setPending(null);await load()}catch(e:any){setError(e.message)}finally{setBusy(false)}};
- const actionLabel=(a:string)=>({power_on:'开机',power_off:'关机',reboot:'重启',rebuild:'重装系统',delete:'删除服务器'} as Record<string,string>)[a]||a;
- const fmt=(n:number)=>'$'+(Number(n)||0).toFixed(4);
- return <section className='panel'>
-  <div className='section-head'><div><h2>云服务器管理</h2><p>DomainHub 控制台 · DigitalOcean 基础设施</p></div><button onClick={()=>void load()} disabled={busy}><RefreshCw size={14}/>刷新</button></div>
-  <p className='server-usage-note'>{connection?connection.connected?'DigitalOcean API 已连接（读取验证通过）。服务器创建和电源操作仍需 Token 具备 Write 权限。':connection.message||'DigitalOcean 尚未连接':'正在检查 DigitalOcean API 连接…'}</p>
-  <div className='server-form'>
-   <label>机房区域<select value={region} onChange={e=>setRegion(e.target.value)}><option value='nyc3'>纽约 · NYC3</option><option value='sfo3'>旧金山 · SFO3</option><option value='ams3'>阿姆斯特丹 · AMS3</option><option value='sgp1'>新加坡 · SGP1</option><option value='lon1'>伦敦 · LON1</option><option value='fra1'>法兰克福 · FRA1</option></select></label>
-   <label>服务器配置<select value={size} onChange={e=>setSize(e.target.value)}><option value='s-1vcpu-1gb'>1核 1GB</option><option value='s-1vcpu-2gb'>1核 2GB</option><option value='s-2vcpu-2gb'>2核 2GB</option><option value='s-2vcpu-4gb'>2核 4GB</option></select></label>
-   <button className='primary' disabled={busy||!connection?.connected||!isAdmin} onClick={()=>setConfirming(true)}>{busy?'处理中…':!isAdmin?'仅管理员可创建':connection?.connected?'创建服务器':'连接成功后可创建'}</button>
-  </div>
-  {error&&<p className='form-error'>{error}</p>}
-  {confirming&&<div className='backdrop'><section className='dialog' role='dialog' aria-modal='true'><button className='close' onClick={()=>setConfirming(false)}>×</button><h2>确认创建云服务器</h2><p>即将通过 DomainHub 的 DigitalOcean 账户创建真实服务器。</p><div className='server-confirm-details'><b>区域：{region.toUpperCase()}</b><b>配置：{size}</b></div><p className='form-error'>创建会产生真实费用。目前站内支付和退款流程尚未接入，请先确认费用承担方式。</p><div className='server-confirm-actions'><button onClick={()=>setConfirming(false)}>取消</button><button className='primary' disabled={busy} onClick={()=>{setConfirming(false);void create()}}>确认创建</button></div></section></div>}
-  <div className='server-list-head'><h3>我的服务器 <span>{servers.length}</span></h3><small>IP 地址和状态来自实时服务器详情</small></div>
-  {servers.map(s=><article className='server-card' key={s.id}>
-   <div className='server-card-top'><div><b>{s.name}</b><small>编号 {s.id} · {s.region||'—'} · {s.size||'—'}</small></div><span className={'server-status '+(s.status==='active'?'is-active':'')}>{s.status==='active'?'运行中':s.status==='off'?'已关机':s.status}</span></div>
-   <div className='server-ip-row'><span>公网 IP</span><b>{s.ip||'等待分配'}</b><button type='button' onClick={()=>{void api('/api/servers/detail?id='+s.id).then(d=>setServers(v=>v.map(x=>x.id===s.id?{...x,...d.droplet}:x))).catch((e:any)=>setError(e.message))}}>刷新 IP / 状态</button></div>
-   <div className='server-actions'>
-    <button disabled={busy||s.status==='active'} onClick={()=>setPending({id:s.id,action:'power_on',name:s.name})}>开机</button>
-    <button disabled={busy||s.status==='off'} onClick={()=>setPending({id:s.id,action:'power_off',name:s.name})}>关机</button>
-    <button disabled={busy||s.status!=='active'} onClick={()=>setPending({id:s.id,action:'reboot',name:s.name})}>重启</button>
-    <button disabled={busy} onClick={()=>setPending({id:s.id,action:'rebuild',name:s.name})}>重装系统</button>
-    <button className='danger-action' disabled={busy} onClick={()=>setPending({id:s.id,action:'delete',name:s.name})}>删除</button>
-   </div>
-   <small className='server-created'>创建时间：{s.created_at?new Date(s.created_at).toLocaleString():'—'}</small>
-  </article>)}
-  {!servers.length&&!error&&<p className='hint'>暂无服务器。</p>}
-  <section className='server-usage'><div className='server-list-head'><h3>服务器消费记录</h3><small>按服务器展示估算用量与控制台操作</small></div><p className='server-usage-note'>{disclaimer}</p>
-   {usage.map(x=><div className='usage-row' key={x.id}><div><b>{x.name}</b><small>{x.status} · 已创建 {x.elapsed_hours.toFixed(1)} 小时</small></div><div><b>{fmt(x.estimated_cost)}</b><small>估算累计 · 月价 {fmt(x.monthly_price)}</small></div></div>)}
-   {!usage.length&&<p className='hint'>暂无可统计的服务器用量。</p>}
-   <h4>操作记录</h4>{events.map(e=><div className='usage-event' key={e.id}><span>{actionLabel(e.action)}</span><b>服务器 #{e.droplet_id}</b><small>{e.created_at?new Date(e.created_at).toLocaleString():'—'} · {e.status==='accepted'?'服务商已接受请求':'处理中'}</small></div>)}
-   {!events.length&&<p className='hint'>暂无操作记录。</p>}
-   {isAdmin&&<><h4>DigitalOcean 账户实际账单</h4><p className='server-usage-note'>以下记录直接来自 DigitalOcean Billing API，属于账户级账单，不等同于单台服务器费用拆分。</p>{billingBalance&&<div className='usage-row'><div><b>本月累计用量</b><small>账单生成时间：{billingBalance.generated_at?new Date(billingBalance.generated_at).toLocaleString():'—'}</small></div><div><b>${Number(billingBalance.month_to_date_usage||0).toFixed(2)}</b><small>账户余额：${Number(billingBalance.account_balance||0).toFixed(2)}</small></div></div>}{billingError&&<p className='form-error'>{billingError}（请确认 Token 具有 billing:read 权限）</p>}{billing.map((x,i)=><div className='usage-event' key={x.invoice_uuid||x.invoice_id||i}><span>{x.type||'账单事件'}</span><b>${Number(x.amount||0).toFixed(2)}</b><small>{x.date?new Date(x.date).toLocaleString():'—'} · {x.description||'—'}{x.invoice_id?' · 发票 '+x.invoice_id:''}</small></div>)}{!billing.length&&!billingError&&<p className='hint'>DigitalOcean 暂无账单历史记录。</p>}</>}
-  </section>
-  {pending&&<div className='backdrop'><section className='dialog' role='dialog' aria-modal='true'><button className='close' onClick={()=>setPending(null)}>×</button><h2>确认{actionLabel(pending.action)}</h2><p>服务器：{pending.name}（#{pending.id}）</p>{pending.action==='rebuild'?<p className='form-error'>将使用 Ubuntu 24.04 重装系统。磁盘现有数据会被清除，无法撤销。</p>:pending.action==='delete'?<p className='form-error'>删除服务器会永久销毁该 Droplet，数据不可恢复。请确认已备份。</p>:pending.action==='power_off'?<p>关机将停止服务器运行；服务商的计费规则仍可能继续产生费用。</p>:pending.action==='reboot'?<p>服务器将重新启动，当前连接会中断。</p>:<p>服务器将启动，可能继续产生服务费用。</p>}<div className='server-confirm-actions'><button onClick={()=>setPending(null)}>取消</button><button className='primary' disabled={busy} onClick={()=>void runAction()}>确认{actionLabel(pending.action)}</button></div></section></div>}
- </section>
+import { useState, type FormEvent } from "react";
+import "./styles.css";
+
+const API = "https://domainhub-api.chulingli1988.workers.dev";
+type Mode = "login" | "register" | "verify";
+type ApiResult = { ok?: boolean; message?: string; error?: string; token?: string; user?: { id: string; email: string; displayName?: string | null; quota?: number } };
+
+async function request(path: string, body: Record<string, unknown>): Promise<ApiResult> {
+  const response = await fetch(API + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json().catch(() => ({})) as ApiResult;
+  if (!response.ok) throw new Error(result.error || result.message || "请求失败，请稍后重试");
+  return result;
 }
 
-function AmbientCanvas(){useEffect(()=>{const canvas=document.querySelector<HTMLCanvasElement>('.ambient-canvas');if(!canvas)return;const ctx=canvas.getContext('2d');if(!ctx)return;let raf=0,w=0,h=0,t=0;const motionReduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;let pts:{x:number;y:number;vx:number;vy:number;r:number;phase:number}[]=[];const resize=()=>{const dpr=Math.min(window.devicePixelRatio||1,1.7);w=canvas.clientWidth;h=canvas.clientHeight;canvas.width=Math.max(1,Math.floor(w*dpr));canvas.height=Math.max(1,Math.floor(h*dpr));ctx.setTransform(dpr,0,0,dpr,0,0);const count=Math.min(150,Math.max(70,Math.floor(w*h/6500)));pts=Array.from({length:count},()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.32,vy:(Math.random()-.5)*.32,r:Math.random()*1.5+.45,phase:Math.random()*Math.PI*2}))};const draw=()=>{t+=.008;ctx.clearRect(0,0,w,h);const cx=w*.5,cy=h*.49,scale=Math.min(w,h);const glow=ctx.createRadialGradient(cx,cy,0,cx,cy,scale*.62);glow.addColorStop(0,'rgba(26,107,220,.17)');glow.addColorStop(.5,'rgba(20,76,170,.07)');glow.addColorStop(1,'rgba(4,12,28,0)');ctx.fillStyle=glow;ctx.fillRect(0,0,w,h);
-// Deep-space orbital rings
-ctx.save();ctx.translate(cx,cy);ctx.rotate(-.18);for(let k=0;k<4;k++){ctx.beginPath();ctx.ellipse(0,0,scale*(.17+k*.075),scale*(.055+k*.024),0,0,Math.PI*2);ctx.strokeStyle='rgba(91,171,255,'+(.16-k*.027)+')';ctx.lineWidth=k===0?1.25:.7;ctx.stroke()}for(let k=0;k<3;k++){const a=t*(.35+k*.12)+k*2.1,rx=scale*(.17+k*.075),ry=scale*(.055+k*.024);const x=Math.cos(a)*rx,y=Math.sin(a)*ry;ctx.beginPath();ctx.arc(x,y,2.1+k*.45,0,Math.PI*2);ctx.fillStyle=k===1?'#9df3ff':'#70aaff';ctx.shadowBlur=16;ctx.shadowColor='#55bfff';ctx.fill();ctx.shadowBlur=0}ctx.restore();
-// Perspective grid floor
-ctx.save();ctx.translate(cx,h*.69);for(let i=0;i<15;i++){const y=i*i*1.7;ctx.beginPath();ctx.moveTo(-w,y);ctx.lineTo(w,y);ctx.strokeStyle='rgba(82,151,242,'+(0.045+i*.002)+')';ctx.lineWidth=.7;ctx.stroke()}for(let i=-12;i<=12;i++){ctx.beginPath();ctx.moveTo(i*scale*.055,0);ctx.lineTo(i*scale*.22,h*.55);ctx.strokeStyle='rgba(82,151,242,.055)';ctx.lineWidth=.7;ctx.stroke()}ctx.restore();
-// Animated network field
-for(let i=0;i<pts.length;i++){const p=pts[i];p.x+=p.vx;p.y+=p.vy;if(p.x<-5)p.x=w+5;if(p.x>w+5)p.x=-5;if(p.y<-5)p.y=h+5;if(p.y>h+5)p.y=-5;const pulse=.55+.45*Math.sin(t*1.7+p.phase);ctx.beginPath();ctx.arc(p.x,p.y,p.r*(.8+pulse*.4),0,Math.PI*2);ctx.fillStyle='rgba(137,199,255,'+(.38+pulse*.45)+')';ctx.shadowBlur=5+pulse*7;ctx.shadowColor='rgba(66,165,255,.8)';ctx.fill();ctx.shadowBlur=0;for(let j=i+1;j<pts.length;j++){const q=pts[j],dx=p.x-q.x,dy=p.y-q.y,d=Math.hypot(dx,dy);if(d<Math.min(150,scale*.18)){ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.strokeStyle='rgba(83,157,255,'+((1-d/Math.min(150,scale*.18))*.17)+')';ctx.lineWidth=.65;ctx.stroke()}}}
-// Traveling luminous data beams
-for(let i=0;i<7;i++){const x=((t*(28+i*7)+i*w/7)%(w+180))-90,y=h*(.18+i*.105)+Math.sin(t*1.2+i)*24,g=ctx.createLinearGradient(x-70,y,x+70,y);g.addColorStop(0,'rgba(80,170,255,0)');g.addColorStop(.5,'rgba(118,222,255,.45)');g.addColorStop(1,'rgba(80,170,255,0)');ctx.beginPath();ctx.moveTo(x-70,y);ctx.lineTo(x+70,y);ctx.strokeStyle=g;ctx.lineWidth=1;ctx.stroke()}
-if(!motionReduced)raf=requestAnimationFrame(draw)};resize();draw();window.addEventListener('resize',resize);return()=>{cancelAnimationFrame(raf);window.removeEventListener('resize',resize)}},[]);return <canvas className="ambient-canvas" aria-hidden="true"/>}
-type LegalDoc='privacy'|'terms'|'';
-function LegalDialog({doc,onClose}:{doc:LegalDoc;onClose:()=>void}){if(!doc)return null;const privacy=doc==='privacy';return <div className="backdrop" onClick={onClose}><section className="dialog legal-dialog" role="dialog" aria-modal="true" aria-labelledby="legal-title" onClick={e=>e.stopPropagation()}><button className="close" onClick={onClose}>×</button><small className="legal-version">DOMAINHUB · 版本 1.0 · 2026-11-01</small><h2 id="legal-title">{privacy?'隐私政策':'用户服务协议'}</h2>{privacy?<><p>本政策说明 DomainHub 作为服务运营方，在你访问网站、注册账户及使用域名、DNS 和云服务器功能时，如何收集、使用、保存、共享和保护个人信息。注册时展示的版本号与同意记录会保存于账户记录中。</p><h3>1. 我们处理的信息</h3><p>账户信息：邮箱地址、账户标识、GitHub 公开资料（仅在你选择 GitHub 授权时）、密码验证摘要及账户状态。我们不会保存你的明文密码或 GitHub OAuth 访问令牌。</p><p>服务数据：域名领取记录、DNS 解析操作、服务器编号与配置、你主动发起的管理操作及相关结果。</p><p>安全数据：登录时间、会话有效期、失败请求计数和经过截断处理的网络地址前缀，用于防止撞库、垃圾注册、滥用和安全事件调查。我们不以收集精确位置为目的。</p><h3>2. 使用目的与处理依据</h3><p>我们使用上述信息创建和维护账户、验证邮箱、处理登录与密码重置、执行你主动提交的域名/DNS/服务器操作、提供客户支持、维护服务安全，以及履行适用法律义务。必要服务数据是提供相应功能的基础；营销用途不属于本政策所述必要处理。</p><h3>3. 第三方服务与跨境处理</h3><p>GitHub 用于你主动选择的 OAuth 身份验证；Resend 用于发送验证和密码重置邮件；DNSHE 用于域名库存与 DNS 操作；DigitalOcean 用于你主动请求的云服务器管理及账单查询；Cloudflare 提供网站托管、边缘计算和数据库服务。相关服务商可能在其运营所在地处理必要数据，并按各自隐私政策承担相应责任。我们不会出售个人信息。</p><h3>4. 密码、会话与安全</h3><p>邮箱密码使用带随机盐的 PBKDF2-SHA-256 摘要保存；会话凭据以摘要形式保存，并设置空闲过期和最长有效期。验证码和 OAuth 一次性凭据均设置有效期并在使用后作废。请勿向任何人透露验证码或密码。</p><h3>5. 保存期限</h3><p>邮箱验证码、密码重置码和 OAuth 临时授权凭据通常在 10 分钟至 1 分钟内失效；登录会话空闲 30 分钟失效，最长 7 天。账户资料、域名和服务操作记录在账户提供服务期间保存；安全日志及法律要求保留的数据仅在实现安全、争议处理或合规目的所需期间保存，之后删除或去标识化。</p><h3>6. 你的权利与账户控制</h3><p>在适用法律允许的范围内，你可以请求访问、更正或删除账户相关个人信息，也可以停止使用服务。提出请求时，我们可能需要验证账户控制权。已发生的财务、安全、争议或法律合规记录可能依法继续保留；删除请求不会自动撤销第三方服务商依法持有的记录。</p><h3>7. Cookie 与本地存储</h3><p>OAuth 流程使用短期安全 Cookie 绑定授权请求；浏览器会话存储用于维持当前登录状态。清除浏览器数据可能导致你退出登录，但不会自动删除服务器端账户数据。</p><h3>8. 未成年人</h3><p>本服务面向具备独立订立相关服务协议能力的用户。若你认为未成年人未经适当授权提供了个人信息，请通过本站支持渠道联系处理。</p><h3>9. 政策更新与联系</h3><p>我们会在本站公布政策版本和生效日期。若信息处理目的或方式发生重大变化，将依法重新征求必要同意。有关隐私请求可通过本站公布的支持渠道提交。</p></>:<><p>欢迎使用 DomainHub。注册、登录或使用本站服务，即表示你同意遵守本协议及适用法律。</p><h3>1. 账户与安全</h3><p>请提供真实、可控制的邮箱并妥善保管密码和登录凭据。不得转让账户、绕过安全措施或利用本站侵害他人权益。</p><h3>2. 域名领取</h3><p>可领取域名以页面实时库存和账户配额为准。领取成功后，域名及相关管理权限按页面说明分配；不得将域名用于钓鱼、诈骗、恶意软件、垃圾邮件或其他违法用途。</p><h3>3. DNS 管理</h3><p>你应确保提交的解析记录合法、准确并拥有相应管理权限。错误配置可能导致网站或邮件中断，提交前请自行核对。</p><h3>4. 云服务器</h3><p>服务器由第三方基础设施服务商提供。创建服务器可能立即产生真实费用，并受服务商定价、可用区域、资源限制和服务条款约束。当前页面的创建操作直接调用服务商账户，不代表本站已提供站内收款、代扣或退款服务；请仅在获得授权并确认费用承担方式后操作。</p><h3>5. 服务边界</h3><p>第三方服务的可用性、价格、资源和政策由相应服务商决定。本站可能因维护、安全或法律要求调整服务；不保证库存、网络或第三方服务持续无中断。</p><h3>6. 违规处理</h3><p>如发现违法用途、滥用资源、攻击行为或违反服务商政策，本站可依法限制相关功能或暂停账户。</p><h3>7. 协议更新</h3><p>协议更新后会在本站公布。继续使用服务前，请留意最新版本。</p></>}<div className="legal-actions"><button className="primary" onClick={onClose}>我知道了</button></div></section></div>}
-type Domain={id:string;domain:string;dnshe_zone_id?:string;status?:string;claimed_at?:string};
-export default function App(){const[tab,setTab]=useState<'home'|'mine'|'servers'>('home'),[token,setToken]=useState(sessionStorage.getItem('domainhub_token')||''),[user,setUser]=useState<any>(null),[domains,setDomains]=useState<Domain[]>([]),[mine,setMine]=useState<Domain[]>([]),[query,setQuery]=useState(''),[quota,setQuota]=useState(0),[modal,setModal]=useState<'login'|'register'|'verify'|'forgot'|'reset'|'dns'|''>('login'),[authLoading,setAuthLoading]=useState(!!sessionStorage.getItem('domainhub_token')),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirm,setConfirm]=useState(''),[verifyCode,setVerifyCode]=useState(''),[resetCode,setResetCode]=useState(''),[resetPasswordValue,setResetPasswordValue]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[selected,setSelected]=useState<Domain|null>(null),[records,setRecords]=useState<any[]>([]),[editingRecord,setEditingRecord]=useState<any>(null),[type,setType]=useState('A'),[name,setName]=useState('@'),[value,setValue]=useState(''),[ttl,setTtl]=useState(600),[notice,setNotice]=useState(''),[legalDoc,setLegalDoc]=useState<'privacy'|'terms'|''>(''),[acceptedLegal,setAcceptedLegal]=useState(false);
-const api=async(path:string,init:RequestInit={})=>{const r=await fetch(API+path,{...init,credentials:'include',headers:{'Content-Type':'application/json',...((sessionStorage.getItem('domainhub_token')||token)?{Authorization:'Bearer '+(sessionStorage.getItem('domainhub_token')||token)}:{}),...(init.headers||{})}});const d=await r.json();if(!r.ok)throw new Error(d.error||'接口请求失败');return d};
-const refresh=async(t=token)=>{if(!t)return;const [me,available,owned]=await Promise.all([api('/auth/me'),api('/domains'),api('/domains/mine')]);setUser(me.user);setQuota(me.user.quota||0);setDomains(available.domains||[]);setMine(owned.domains||[])};
-useEffect(()=>{const params=new URLSearchParams(window.location.search),verify=params.get('verify_token'),reset=params.get('reset_token'),oauth=params.get('oauth_code'),authError=params.get('auth_error');if(reset){setModal('reset')}if(authError)setError(authError==='github_state'?'GitHub 授权状态校验失败，请重新尝试。':authError==='github_unconfigured'?'GitHub 授权尚未配置，请检查 OAuth 服务配置。':authError==='oauth_consent_required'?'请先阅读并同意用户服务协议和隐私政策，再使用 GitHub 注册。':authError==='github_failed'?'GitHub 授权失败，请确认邮箱已验证后重试。':'GitHub 尚未注册 DomainHub，请切换到注册页并同意协议后使用 GitHub 注册。');if(verify){api('/auth/email/verify?token='+encodeURIComponent(verify)).then((d:any)=>setNotice(d.message||'邮箱验证成功，请登录')).catch((e:any)=>setError(e.message))}if(oauth){setAuthLoading(true);api('/auth/github/exchange',{method:'POST',body:JSON.stringify({code:oauth})}).then(async(d:any)=>{sessionStorage.setItem('domainhub_token',d.token);setToken(d.token);setUser(d.user);setQuota(d.user.quota||0);setModal('');const [a,b]=await Promise.all([api('/domains'),api('/domains/mine')]);setDomains(a.domains||[]);setMine(b.domains||[]) }).catch((e:any)=>setError(e.message)).finally(()=>{setAuthLoading(false);window.history.replaceState({},document.title,window.location.pathname)})}if((verify||reset||authError)&&!oauth)window.history.replaceState({},document.title,window.location.pathname)},[]);useEffect(()=>{if(token){api('/auth/me').then((d:any)=>{setUser(d.user);setQuota(d.user.quota||0);return Promise.all([api('/domains'),api('/domains/mine')])}).then(([a,b]:any)=>{setDomains(a.domains||[]);setMine(b.domains||[]) }).catch(()=>{sessionStorage.removeItem('domainhub_token');setToken('');setUser(null)}).finally(()=>setAuthLoading(false))}else if(!new URLSearchParams(window.location.search).has('oauth_code'))setAuthLoading(false)},[]);const auth=async(e:FormEvent)=>{e.preventDefault();setBusy(true);setError('');setNotice('');try{if(modal==='register'&&!acceptedLegal)throw new Error('请先阅读并同意《用户服务协议》和《隐私政策》');if(modal==='register'&&password!==confirm)throw new Error('两次密码不一致');const d=await api(modal==='register'?'/auth/register':'/auth/login',{method:'POST',body:JSON.stringify({email,password,termsAccepted:acceptedLegal,privacyAccepted:acceptedLegal,termsVersion:'1.0',privacyVersion:'1.0'})});if(modal==='register'){setNotice(d.message||'验证码已发送，请查收邮件');setModal('verify');setPassword('');setConfirm('');return}sessionStorage.setItem('domainhub_token',d.token);setToken(d.token);setUser(d.user);setQuota(d.user.quota||0);setModal('');setPassword('');setConfirm('');const [a,b]=await Promise.all([api('/domains'),api('/domains/mine')]);setDomains(a.domains||[]);setMine(b.domains||[])}catch(e:any){setError(e.message)}finally{setBusy(false)}};
-const resendVerification=async()=>{setBusy(true);setError('');setNotice('');try{const d=await api('/auth/email/verification/send',{method:'POST',body:JSON.stringify({email})});setNotice(d.message||'验证码已发送，请查收邮件')}catch(e:any){setError(e.message)}finally{setBusy(false)}};
-const forgotPassword=async(e:FormEvent)=>{e.preventDefault();setBusy(true);setError('');setNotice('');try{const d=await api('/auth/password/forgot',{method:'POST',body:JSON.stringify({email})});setNotice(d.message||'重置验证码已发送');setModal('reset')}catch(e:any){setError(e.message)}finally{setBusy(false)}};
-const resetPassword=async(e:FormEvent)=>{e.preventDefault();setBusy(true);setError('');setNotice('');try{const d=await api('/auth/password/reset',{method:'POST',body:JSON.stringify({email,code:resetCode,password:resetPasswordValue})});setNotice(d.message||'密码重置成功，请登录');setResetPasswordValue('');setModal('login')}catch(e:any){setError(e.message)}finally{setBusy(false)}};
-const logout=async()=>{try{await api('/auth/logout',{method:'POST'})}catch{}sessionStorage.removeItem('domainhub_token');setToken('');setUser(null);setQuota(0);setMine([])};
-const claim=async(d:Domain)=>{try{const r=await api('/domains/claim',{method:'POST',body:JSON.stringify({inventoryId:d.id})});setQuota(r.quota);setNotice('领取成功：'+r.domain.domain);await refresh()}catch(e:any){setNotice(e.message)}};
-const refreshDns=async(zoneId=selected?.dnshe_zone_id||'')=>{const r=await api('/dns/records?zoneId='+encodeURIComponent(zoneId));setRecords(r.records||[])};
-const openDns=async(d:Domain)=>{setSelected(d);setEditingRecord(null);setName('@');setValue('');try{const r=await api('/dns/records?zoneId='+encodeURIComponent(d.dnshe_zone_id||''));setRecords(r.records||[]);setModal('dns')}catch(e:any){setNotice(e.message)}};
-const editDns=(r:any)=>{setEditingRecord(r);setType(String(r.type||'A').toUpperCase());setName(String(r.name||'@'));setValue(String(r.value||r.content||''));setTtl(Number(r.ttl||600));setError('')};
-const saveDns=async(e:FormEvent)=>{e.preventDefault();if(!selected)return;try{const recordId=String(editingRecord?.id||editingRecord?.record_id||'');const payload={zoneId:selected.dnshe_zone_id,type,name,value,ttl,...(editingRecord?{recordId}:{})};await api('/dns/records',{method:editingRecord?'PATCH':'POST',body:JSON.stringify(payload)});await refreshDns();setEditingRecord(null);setName('@');setValue('');setNotice(editingRecord?'DNS 记录已更新':'DNSHE 已接受解析记录')}catch(e:any){setError(e.message)}};
-const deleteDns=async(r:any)=>{if(!selected)return;const recordId=String(r.id||r.record_id||'');if(!recordId)return; if(!window.confirm('确认删除这条 DNS 解析记录？'))return;try{await api('/dns/records',{method:'DELETE',body:JSON.stringify({zoneId:selected.dnshe_zone_id,recordId})});await refreshDns();if(editingRecord&&(editingRecord.id===r.id||editingRecord.record_id===r.record_id)){setEditingRecord(null);setName('@');setValue('')}setNotice('DNS 记录已删除')}catch(e:any){setError(e.message)}};
-const filtered=domains.filter(d=>d.domain.toLowerCase().includes(query.toLowerCase()));
-if(!user){
-  if(authLoading)return <div className="app-shell auth-shell"><main className="auth-main auth-loading"><span className="auth-orbit"><Globe2/></span><p>正在安全连接 DomainHub…</p></main></div>;
-  return <div className="app-shell auth-shell"><div className="ambient-layer"><AmbientCanvas/></div><main className="auth-main"><section className="auth-intro"><div className="auth-kicker"><span><ShieldCheck size={13}/></span> DOMAINHUB · 域名基础设施</div><div className="auth-logo"><Globe2 size={34} strokeWidth={1.7}/><span className="auth-logo-orbit"><LockKeyhole size={13}/></span></div><h1>连接你的<br/><em>数字资产中心</em></h1><p>安全管理域名、DNS 解析与云服务器。登录后即可进入你的专属控制台。</p><div className="auth-signals"><span><i/>安全身份验证</span><span><i/>Cloudflare 边缘网络</span><span><i/>实时资产管理</span></div></section><section className="auth-card"><div className="auth-card-head"><small>欢迎使用 DOMAINHUB</small><h2>{modal==='register'?'创建你的账户':modal==='forgot'?'找回密码':modal==='reset'?'设置新密码':'欢迎回来'}</h2><p>{modal==='register'?'注册后请通过邮件验证邮箱。':modal==='forgot'?'输入注册邮箱，我们将发送 6 位密码重置验证码。':modal==='reset'?'请设置一个新的账户密码。':'登录账户以继续访问控制台。'}</p></div>{(modal==='login'||modal==='register')&&<><div className="auth-switch"><button className={modal==='login'?'selected':''} onClick={()=>{setModal('login');setError('');setNotice('')}}>登录</button><button className={modal==='register'?'selected':''} onClick={()=>{setModal('register');setError('');setNotice('')}}>注册</button></div><form onSubmit={auth} className="auth-form"><label><span className="auth-label"><Mail size={15}/>邮箱地址</span><input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com" required/></label><label><span className="auth-label"><LockKeyhole size={15}/>密码</span><input type="password" autoComplete={modal==='register'?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)} placeholder="至少 12 位字符" minLength={12} required/></label>{modal==='register'&&<><label><span className="auth-label"><CheckCircle2 size={15}/>确认密码</span><input type="password" autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder="再次输入密码" minLength={12} required/></label><label className="legal-consent"><input type="checkbox" checked={acceptedLegal} onChange={e=>setAcceptedLegal(e.target.checked)} required/><span>我已阅读并同意 <button type="button" onClick={()=>setLegalDoc('terms')}>《用户服务协议》</button> 和 <button type="button" onClick={()=>setLegalDoc('privacy')}>《隐私政策》</button></span></label></>}{error&&<p className="form-error">{error}</p>}{notice&&<p className="auth-notice">{notice}</p>}<button className="primary auth-submit" disabled={busy||(modal==='register'&&!acceptedLegal)}>{busy?(modal==='register'?'正在创建账户…':'正在登录…'):(modal==='register'?'创建账户并发送验证邮件':'登录并进入控制台')}<ArrowRight size={17}/></button></form><button type="button" className="auth-link" onClick={()=>{setModal('verify');setVerifyCode('');setError('');setNotice('')}}>已有账户未完成邮箱验证？立即验证</button>{modal==='login'&&<button type="button" className="auth-link" onClick={()=>{setModal('forgot');setError('');setNotice('')}}>忘记密码？</button>}<div className="auth-divider"><span>或使用以下方式</span></div><button type="button" className="github-auth" disabled={modal==='register'&&!acceptedLegal} onClick={()=>{window.location.href='https://lynli.me/api/github-oauth/start'+(modal==='register'?'?mode=register&terms=1.0&privacy=1.0':'?mode=login')}}><Github size={19} strokeWidth={2}/>{modal==='register'?'使用 GitHub 注册':'使用 GitHub 登录'}</button></>}
-{modal==='verify'&&<form className="auth-form auth-secondary-form" onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{const d=await api('/auth/email/verify',{method:'POST',body:JSON.stringify({email,code:verifyCode})});setNotice(d.message||'邮箱验证成功，请登录');setModal('login');setVerifyCode('')}catch(err:any){setError(err.message)}finally{setBusy(false)}}}><p className="auth-recipient">请输入注册邮箱并填写收到的验证码。</p><label><span className="auth-label"><Mail size={15}/>注册邮箱</span><input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com" required/></label><label><span className="auth-label"><ShieldCheck size={15}/>邮箱验证码</span><input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={verifyCode} onChange={e=>setVerifyCode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="输入邮件中的 6 位验证码" required/></label>{error&&<p className="form-error">{error}</p>}{notice&&<p className="auth-notice">{notice}</p>}<button className="primary auth-submit" disabled={busy||verifyCode.length!==6}>{busy?'正在验证…':'验证邮箱并登录'}</button><button type="button" className="auth-link" disabled={busy} onClick={()=>void resendVerification()}>重新发送验证码</button></form>}
-{modal==='forgot'&&<form className="auth-form auth-secondary-form" onSubmit={forgotPassword}><label>注册邮箱<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com" required/></label>{error&&<p className="form-error">{error}</p>}{notice&&<p className="auth-notice">{notice}</p>}<button className="primary auth-submit" disabled={busy}>{busy?'正在发送…':'发送密码重置邮件'}</button><button type="button" className="auth-link" onClick={()=>{setModal('login');setError('');setNotice('')}}>返回登录</button></form>}
-{modal==='reset'&&<form className="auth-form auth-secondary-form" onSubmit={resetPassword}><label>重置验证码<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={resetCode} onChange={e=>setResetCode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="输入邮件中的 6 位验证码" required/></label><label>新密码<input type="password" autoComplete="new-password" minLength={12} value={resetPasswordValue} onChange={e=>setResetPasswordValue(e.target.value)} placeholder="至少 12 位字符" required/></label>{error&&<p className="form-error">{error}</p>}{notice&&<p className="auth-notice">{notice}</p>}<button className="primary auth-submit" disabled={busy}>{busy?'正在重置…':'确认重置密码'}</button><button type="button" className="auth-link" onClick={()=>{setModal('login');setError('');setNotice('')}}>返回登录</button></form>}<div className="auth-security"><ShieldCheck size={15}/>账户凭证通过加密连接传输</div></section></main><footer className="auth-footer">DOMAINHUB <span>·</span> 让域名资产管理更简单 <span>·</span> <button type="button" onClick={()=>setLegalDoc('terms')}>用户协议</button> <button type="button" onClick={()=>setLegalDoc('privacy')}>隐私政策</button></footer><LegalDialog doc={legalDoc} onClose={()=>setLegalDoc('')}/></div>;
+export default function App() {
+  const [mode, setMode] = useState<Mode>("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [code, setCode] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [signedIn, setSignedIn] = useState<{ email: string; quota: number } | null>(null);
+
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    setError("");
+    setNotice("");
+  };
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await request("/auth/login", { email, password });
+      if (!result.token || !result.user) throw new Error("登录响应不完整，请重试");
+      sessionStorage.setItem("domainhub_token", result.token);
+      setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
+      setPassword("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "登录失败");
+    } finally { setBusy(false); }
+  }
+
+  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await request("/auth/register", {
+        email, password, displayName, termsAccepted, privacyAccepted,
+        termsVersion: "1.0", privacyVersion: "1.0",
+      });
+      setNotice(result.message || "请检查邮箱并完成验证。");
+      setCode("");
+      setMode("verify");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "注册失败");
+    } finally { setBusy(false); }
+  }
+
+  async function handleVerify(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await request("/auth/email/verify", { email, code });
+      setNotice(result.message || "邮箱验证成功，请登录。");
+      setCode("");
+      setPassword("");
+      setMode("login");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "验证失败");
+    } finally { setBusy(false); }
+  }
+
+  async function resendCode() {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await request("/auth/email/verification/send", { email });
+      setNotice(result.message || "如果该邮箱对应待验证账户，我们会发送验证邮件。");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "发送失败");
+    } finally { setBusy(false); }
+  }
+
+  function logout() {
+    sessionStorage.removeItem("domainhub_token");
+    setSignedIn(null);
+    setEmail("");
+    setPassword("");
+    setMode("login");
+    setNotice("已安全退出登录。");
+  }
+
+  return (
+    <main className="auth-shell">
+      <div className="ambient ambient-one" />
+      <div className="ambient ambient-two" />
+      <header className="topbar">
+        <a className="brand" href="/" aria-label="DomainHub 首页">
+          <span className="brand-mark">D</span>
+          <span>Domain<span className="brand-light">Hub</span></span>
+        </a>
+        <span className="topbar-note">DOMAIN MANAGEMENT PLATFORM</span>
+      </header>
+
+      <section className="auth-layout">
+        <div className="intro">
+          <div className="eyebrow"><span /> DOMAIN INFRASTRUCTURE, SIMPLIFIED</div>
+          <h1>你的域名，<br /><span>由你掌控。</span></h1>
+          <p>在一个清晰、可靠的工作空间中管理域名与 DNS。安全登录，从这里开始。</p>
+          <div className="intro-points">
+            <div><i>01</i><span><b>统一管理</b><small>域名与解析信息一处查看</small></span></div>
+            <div><i>02</i><span><b>账户安全</b><small>邮箱验证与安全会话保护</small></span></div>
+            <div><i>03</i><span><b>清晰可控</b><small>每项操作都由你主动发起</small></span></div>
+          </div>
+          <div className="intro-foot"><span className="status-dot" /> DOMAINHUB ACCOUNT GATEWAY</div>
+        </div>
+
+        <section className="auth-card" aria-labelledby="auth-title">
+          {signedIn ? (
+            <div className="success-state">
+              <div className="success-icon">✓</div>
+              <p className="card-kicker">AUTHENTICATION COMPLETE</p>
+              <h2 id="auth-title">登录成功</h2>
+              <p className="muted">当前已通过身份验证。</p>
+              <div className="account-summary"><span>账户邮箱</span><b>{signedIn.email}</b><span>当前配额</span><b>{signedIn.quota}</b></div>
+              <button className="button button-primary" onClick={logout}>退出登录</button>
+            </div>
+          ) : (
+            <>
+              <div className="card-heading">
+                <p className="card-kicker">WELCOME TO DOMAINHUB</p>
+                <h2 id="auth-title">{mode === "register" ? "创建账户" : mode === "verify" ? "验证邮箱" : "欢迎回来"}</h2>
+                <p>{mode === "register" ? "填写信息，开启你的域名管理空间。" : mode === "verify" ? "输入发送到邮箱的 6 位验证码。" : "登录你的账户以继续使用 DomainHub。"}</p>
+              </div>
+
+              {mode !== "verify" && (
+                <div className="mode-switch" role="tablist" aria-label="登录或注册">
+                  <button type="button" role="tab" aria-selected={mode === "login"} className={mode === "login" ? "active" : ""} onClick={() => switchMode("login")}>登录</button>
+                  <button type="button" role="tab" aria-selected={mode === "register"} className={mode === "register" ? "active" : ""} onClick={() => switchMode("register")}>注册</button>
+                </div>
+              )}
+
+              {error && <div className="feedback feedback-error" role="alert">{error}</div>}
+              {notice && <div className="feedback feedback-success" role="status">{notice}</div>}
+
+              {mode === "login" && (
+                <form onSubmit={handleLogin} className="auth-form">
+                  <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
+                  <label>登录密码<input type="password" autoComplete="current-password" required minLength={12} value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码（至少 12 位）" /></label>
+                  <button className="button button-primary" type="submit" disabled={busy}>{busy ? "正在登录…" : "登录账户"}<span>→</span></button>
+                  <p className="form-foot">尚未拥有账户？ <button type="button" className="text-button" onClick={() => switchMode("register")}>立即注册</button></p>
+                </form>
+              )}
+
+              {mode === "register" && (
+                <form onSubmit={handleRegister} className="auth-form">
+                  <label>显示名称 <span className="optional">选填</span><input autoComplete="nickname" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="你希望如何称呼你" maxLength={60} /></label>
+                  <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
+                  <label>设置密码<input type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} placeholder="至少 12 位，最多 128 位" /></label>
+                  <div className="consents">
+                    <label className="check-row"><input type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} /><span>我已阅读并同意 <a href="#terms">用户服务协议</a></span></label>
+                    <label className="check-row"><input type="checkbox" checked={privacyAccepted} onChange={e => setPrivacyAccepted(e.target.checked)} /><span>我已阅读并同意 <a href="#privacy">隐私政策</a></span></label>
+                  </div>
+                  <button className="button button-primary" type="submit" disabled={busy || !termsAccepted || !privacyAccepted}>{busy ? "正在创建账户…" : "创建账户"}<span>→</span></button>
+                  <p className="form-foot">已有账户？ <button type="button" className="text-button" onClick={() => switchMode("login")}>返回登录</button></p>
+                </form>
+              )}
+
+              {mode === "verify" && (
+                <form onSubmit={handleVerify} className="auth-form">
+                  <div className="verify-email">{email}</div>
+                  <label>6 位邮箱验证码<input className="code-input" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" /></label>
+                  <button className="button button-primary" type="submit" disabled={busy || code.length !== 6}>{busy ? "正在验证…" : "验证邮箱"}<span>→</span></button>
+                  <div className="verify-actions"><button type="button" className="text-button" onClick={() => void resendCode()} disabled={busy}>重新发送验证码</button><button type="button" className="text-button subtle" onClick={() => switchMode("register")}>返回修改信息</button></div>
+                  <p className="hint">验证码有效期为 10 分钟。若未收到，请检查垃圾邮件文件夹。</p>
+                </form>
+              )}
+            </>
+          )}
+        </section>
+      </section>
+
+      <footer className="site-footer"><span>© {new Date().getFullYear()} DOMAINHUB</span><span>SECURE ACCESS · PRIVATE BY DESIGN</span></footer>
+    </main>
+  );
 }
-return <div className="app-shell"><header className="topbar"><a className="brand" onClick={()=>setTab('home')}><span className="brand-mark"><Globe2/></span>Domain<span>Hub</span></a><nav className="main-nav" aria-label="主导航"><button className={tab==='home'?'active':''} onClick={()=>setTab('home')}>域名库存</button><button className={tab==='mine'?'active':''} onClick={()=>setTab('mine')}>我的域名</button><button className={tab==='servers'?'active':''} onClick={()=>setTab('servers')}>云服务器</button></nav><div className="top-actions">{user?<><b className="quota-pill">配额 {quota}</b><span>{user.email}</span><button onClick={logout}><LogOut size={14}/>退出</button></>:<button onClick={()=>setModal('login')}><LogIn size={14}/>登录 / 注册</button>}</div></header>
-<div className="ambient-layer"><AmbientCanvas/></div><main><section className="hero" aria-label="域名管理平台"><div className="hero-copy"><small>域名管理平台</small><h1>域名资产<br/><em>清晰、可控、可管理</em></h1><p>域名库存、配额领取与 DNS 解析管理。</p></div></section>
-{!user&&<section className="panel"><b>登录后查看实时域名库存并领取。</b><button className="primary" onClick={()=>setModal('login')}>登录</button></section>}
-{tab==='servers'?<ServersPage api={api} isAdmin={user?.email?.toLowerCase()==='boss@lynli.me'}/>:tab==='home'?<section className="panel"><div className="section-head"><div><h2>可领取域名</h2><p>数据来自 Cloudflare D1 的 domain_inventory。</p></div><button onClick={()=>refresh()}><RefreshCw size={14}/>刷新</button></div><div className="searchbar"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索域名"/></div><div className="results-head">可用库存 <span>{filtered.length}</span></div>{filtered.map(d=><article className="domain-row" key={d.id}><Globe2/><div><b>{d.domain}</b><small>DNSHE 域名区域 · D1 实时库存</small></div><span className="available">可领取</span><button className="claim" disabled={!user||quota<1} onClick={()=>claim(d)}>领取</button></article>)}{!filtered.length&&<p className="hint">当前没有可领取域名。管理员同步 DNSHE 域名区域后会显示在这里。</p>}</section>:<section className="panel"><div className="section-head"><div><h2>我的域名</h2><p>已写入 D1 的 user_domains 领取记录。</p></div><button onClick={()=>refresh()}><RefreshCw size={14}/>刷新</button></div>{mine.map(d=><article className="domain-row" key={d.id}><Globe2/><div><b>{d.domain}</b><small>领取时间：{d.claimed_at||'—'}</small></div><button className="claim" onClick={()=>openDns(d)}>DNS 管理</button></article>)}{!mine.length&&<p className="hint">尚未领取域名。</p>}</section>}</main><footer className="site-footer">© DomainHub <span>·</span> <button type="button" onClick={()=>setLegalDoc('terms')}>用户服务协议</button> <button type="button" onClick={()=>setLegalDoc('privacy')}>隐私政策</button></footer>
-{notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}　×</div>}<LegalDialog doc={legalDoc} onClose={()=>setLegalDoc('')}/>
-{modal==='dns'&&<div className="backdrop"><section className="dialog"><button className="close" onClick={()=>{setModal('');setError('');setEditingRecord(null)}}>×</button>{<><h2>DNSHE 解析管理</h2><p>{selected?.domain}</p><form onSubmit={saveDns}><label>记录类型<select value={type} onChange={e=>setType(e.target.value)}><option>A</option><option>AAAA</option><option>CNAME</option><option>MX</option><option>TXT</option><option>SRV</option><option>CAA</option></select></label><label>主机记录<input value={name} onChange={e=>setName(e.target.value)} required/></label><label>记录值<input value={value} onChange={e=>setValue(e.target.value)} required/></label><label>TTL<input type="number" min="0" max="86400" value={ttl} onChange={e=>setTtl(Number(e.target.value))}/></label>{error&&<p className="form-error">{error}</p>}<button className="primary">{editingRecord?'保存修改':'新增解析记录'}</button>{editingRecord&&<button type="button" onClick={()=>{setEditingRecord(null);setName('@');setValue('')}}>取消编辑</button>}</form><h3>现有解析记录</h3>{records.map((r,i)=><div key={r.id||r.record_id||i} className="dns-row"><span>{r.name}　{r.type}　{r.value||r.content}　TTL {r.ttl||'默认'}</span><button type="button" onClick={()=>editDns(r)}>编辑</button><button type="button" onClick={()=>void deleteDns(r)}>删除</button></div>)}</>}</section></div>}</div>}
