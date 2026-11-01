@@ -22,7 +22,7 @@ async function rateLimit(env,dimension,subject,windowMs,limit){const now=Date.no
 const rfc3986=value=>encodeURIComponent(String(value)).replace(/[!'()*]/g,c=>"%"+c.charCodeAt(0).toString(16).toUpperCase());
 async function sendMail(env,to,subject,html,text){
  if(!env.RESEND_API_KEY||!env.RESEND_FROM_EMAIL)throw Object.assign(new Error("邮件服务尚未配置"),{status:503});
- const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Authorization":"Bearer "+env.RESEND_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({from:env.RESEND_FROM_EMAIL,to:[to],subject,html,text})});
+ const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Authorization":"Bearer "+env.RESEND_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({from:"DomainHub 官方团队 <boss@lynli.me>",to:[to],subject,html,text})});
  const result=await response.json().catch(()=>({}));
  if(!response.ok||result.error)throw Object.assign(new Error(result.message||result.error?.message||"邮件发送失败"),{status:502});
  return result;
