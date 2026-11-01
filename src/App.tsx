@@ -12,7 +12,8 @@ function ServersPage({api,isAdmin}:{api:(path:string,init?:RequestInit)=>Promise
  const actionLabel=(a:string)=>({power_on:'开机',power_off:'关机',reboot:'重启',rebuild:'重装系统',delete:'删除服务器'} as Record<string,string>)[a]||a;
  const fmt=(n:number)=>'$'+(Number(n)||0).toFixed(4);
  return <section className='panel'>
-  <div className='section-head'><div><h2>云服务器管理</h2><p>DomainHub 控制台 · DigitalOcean 基础设施</p></div><button onClick={()=>void load()} disabled={busy}><RefreshCw size={14}/>刷新</button></div>\n  <p className='server-usage-note'>{connection?connection.connected?'DigitalOcean API 已连接（读取验证通过）。服务器创建和电源操作仍需 Token 具备 Write 权限。':connection.message||'DigitalOcean 尚未连接':'正在检查 DigitalOcean API 连接…'}</p>
+  <div className='section-head'><div><h2>云服务器管理</h2><p>DomainHub 控制台 · DigitalOcean 基础设施</p></div><button onClick={()=>void load()} disabled={busy}><RefreshCw size={14}/>刷新</button></div>
+  <p className='server-usage-note'>{connection?connection.connected?'DigitalOcean API 已连接（读取验证通过）。服务器创建和电源操作仍需 Token 具备 Write 权限。':connection.message||'DigitalOcean 尚未连接':'正在检查 DigitalOcean API 连接…'}</p>
   <div className='server-form'>
    <label>机房区域<select value={region} onChange={e=>setRegion(e.target.value)}><option value='nyc3'>纽约 · NYC3</option><option value='sfo3'>旧金山 · SFO3</option><option value='ams3'>阿姆斯特丹 · AMS3</option><option value='sgp1'>新加坡 · SGP1</option><option value='lon1'>伦敦 · LON1</option><option value='fra1'>法兰克福 · FRA1</option></select></label>
    <label>服务器配置<select value={size} onChange={e=>setSize(e.target.value)}><option value='s-1vcpu-1gb'>1核 1GB</option><option value='s-1vcpu-2gb'>1核 2GB</option><option value='s-2vcpu-2gb'>2核 2GB</option><option value='s-2vcpu-4gb'>2核 4GB</option></select></label>
