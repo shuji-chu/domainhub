@@ -478,9 +478,9 @@ main{display:block;padding-bottom:88px}
 .auth-secondary-form{margin-top:24px}
 @media(max-width:390px){.auth-divider{margin:16px 0 12px}.github-auth{min-height:43px}}
 
-/* DomainHub 登录页：简洁蓝白主题，移除粒子/网格/轨道动画 */
+/* DomainHub 登录页：蓝白主题与动态背景 */
 :root{--auth-ink:#17324f;--auth-muted:#61758e;--auth-line:#d7e6f5;--auth-blue:#2878e8}
-.app-shell:before,.auth-shell:after,.auth-shell .ambient-layer{display:none!important}
+.app-shell:before,.auth-shell:after{display:none!important}
 .auth-shell{min-height:100svh;overflow:auto;padding:24px 16px 18px;background:linear-gradient(145deg,#eaf4ff 0%,#f7fbff 52%,#fff 100%)}
 .auth-main{max-width:460px;padding:18px 0}
 .auth-card{max-width:460px;padding:32px 30px 26px;color:#17324f;background:rgba(255,255,255,.96);border:1px solid #d7e6f5;border-radius:20px;box-shadow:0 18px 55px rgba(38,91,150,.12);backdrop-filter:none}
@@ -539,9 +539,7 @@ body{
   color:#17324f;
   background:transparent;
 }
-.app-shell:before,.ambient-layer,.ambient-canvas{
-  display:none!important;
-}
+.app-shell:before{display:none!important;}
 /* 顶部导航与品牌 */
 .topbar{
   color:#17324f;
@@ -711,14 +709,15 @@ body{
   .panel{background:rgba(255,255,255,.96)}
 }
 
-/* Final global blue-white system: quiet, readable, and motion-free */
+/* Final global blue-white system; preserve intentional canvas motion */
 :root{color-scheme:light;background:#f5f9ff;color:#17324f;--ink:#17324f;--muted:#61758e;--line:#d8e5f2;--blue:#2878e8}
 html,body,#root{min-height:100%;background:#f5f9ff;color:#17324f}
 html{scroll-behavior:auto}
 body{background:linear-gradient(180deg,#edf5ff 0%,#f7faff 42%,#fff 100%) fixed}
-*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
-button:hover,.primary:hover,.claim:hover{transform:none!important}
-.ambient-layer,.ambient-canvas,.app-shell:before{display:none!important}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+.app-shell:before{display:none!important}
 .auth-shell{background:linear-gradient(180deg,#eaf4ff 0%,#f7fbff 48%,#fff 100%)}
 .legal-consent{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:9px!important;margin:2px 0 0;color:#526c87!important;font-size:11px!important;line-height:1.8}
 .legal-consent input{flex:0 0 16px;width:16px!important;height:16px;min-height:16px!important;margin:3px 0 0;accent-color:#2878e8}
