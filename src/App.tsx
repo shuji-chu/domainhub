@@ -25,6 +25,7 @@ export default function App() {
   const [displayName, setDisplayName] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
+  const [testVerificationCode, setTestVerificationCode] = useState("");
   const [countdown, setCountdown] = useState(0);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -166,7 +167,7 @@ export default function App() {
       setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
       setAuthOpen(false);
       setNotice(result.message || "注册成功，已自动登录");
-      setCode(""); setCodeSent(false); setCountdown(0);
+      setCode(""); setCodeSent(false); setTestVerificationCode(""); setCountdown(0);
       setPassword("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "验证码错误或已过期");
@@ -174,7 +175,7 @@ export default function App() {
   }
 
   async function handleGetCode() {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
       setError("请先填写有效的邮箱地址。"); return;
     }
     if (password.length < 12 || password.length > 128) {
@@ -185,20 +186,25 @@ export default function App() {
     }
     setBusy(true); setError(""); setNotice("");
     try {
-      if (!codeSent) {
-        const result = await request("/auth/register", {
-          email, password, displayName, termsAccepted, privacyAccepted,
-          termsVersion: "1.0", privacyVersion: "1.0",
-        });
-        setCodeSent(true);
-        setNotice(result.message || "验证码已发送，请查收邮箱。");
-        if (result.verificationCode) window.alert("【测试模式】您的验证码是："+result.verificationCode);
-      } else {
-        const result = await request("/auth/email/verification/send", { email });
-        setNotice(result.message || "验证码已重新发送。");
-        if (result.verificationCode) window.alert("【测试模式】您的验证码是："+result.verificationCode);
+      const result = !codeSent
+        ? await request("/auth/register", {
+            email, password, displayName, termsAccepted, privacyAccepted,
+            termsVersion: "1.0", privacyVersion: "1.0",
+          })
+        : await request("/auth/email/verification/send", { email });
 
+      if (result.testMode && !result.verificationCode) {
+        throw new Error("测试通道没有返回验证码，请重试；邮箱和密码尚未锁定。");
       }
+      if (result.verificationCode) {
+        setTestVerificationCode(result.verificationCode);
+        setCode(result.verificationCode);
+        setNotice("测试验证码已生成，已显示在下方，可直接提交注册。");
+      } else {
+        setTestVerificationCode("");
+        setNotice(result.message || (codeSent ? "验证码已重新发送，请查收邮箱。" : "验证码已发送，请查收邮箱。"));
+      }
+      setCodeSent(true);
       setCountdown(60);
     } catch (err) {
       setError(err instanceof Error ? err.message : "验证码发送失败");
@@ -343,6 +349,13 @@ export default function App() {
                     <label>邮箱验证码<input className="code-input" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="输入 6 位验证码" /></label>
                     <button className="button button-code" type="button" onClick={() => void handleGetCode()} disabled={busy || countdown > 0 || !email || !password || !termsAccepted || !privacyAccepted}>{busy ? "发送中…" : countdown > 0 ? `${countdown} 秒后重发` : codeSent ? "重新获取" : "获取验证码"}</button>
                   </div>
+                  {testVerificationCode && (
+                    <div className="test-code-panel" role="status" aria-live="polite">
+                      <span>测试通道验证码 · 10 分钟有效</span>
+                      <strong>{testVerificationCode}</strong>
+                      <p>当前未配置邮件服务，验证码直接显示在这里；已自动填入上方输入框。</p>
+                    </div>
+                  )}
                   <p className="hint">{codeSent ? "验证码已发送至邮箱，有效期 10 分钟；邮箱、密码和显示名称已锁定。" : "请先填写邮箱和密码，并勾选下方协议后获取验证码。"}</p>
                   <div className="consents">
                     <label className="check-row"><input type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} disabled={codeSent} /><span>我已阅读并同意 <a href="#terms">用户服务协议</a></span></label>
