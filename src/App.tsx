@@ -301,8 +301,12 @@ export default function App() {
       <footer className="site-footer"><span>© {new Date().getFullYear()} DomainHub</span><span>安全 · 简洁 · 自主掌控</span></footer>
       {authOpen && !signedIn && (
         <div className="auth-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setAuthOpen(false); }}>
-          <section className="auth-card auth-modal" aria-labelledby="auth-title">
-            <button className="auth-close" type="button" aria-label="关闭" onClick={() => setAuthOpen(false)}>×</button>
+          <div className="flex min-h-screen w-full items-center justify-center px-4 py-6">
+            <section className="auth-card auth-modal w-full max-w-md min-w-0" aria-labelledby="auth-title">
+              <div className="auth-card-toolbar">
+                <span aria-hidden="true" />
+                <button className="auth-close" type="button" aria-label="关闭" onClick={() => setAuthOpen(false)}>×</button>
+              </div>
               <div className="card-heading">
                 {mode === "register" && <div className="card-brand"><img src="/logo.svg" alt="DomainHub" /><span>Domain<span>Hub</span></span></div>}
                 <p className="card-kicker">欢迎使用</p>
@@ -358,7 +362,8 @@ export default function App() {
                   <p className="hint">验证码有效期为 10 分钟。若未收到，请检查垃圾邮件文件夹。</p>
                 </form>
               )}
-          </section>
+            </section>
+          </div>
         </div>
       )}
     </main>
