@@ -86,3 +86,5 @@ button{cursor:pointer}
 .button-primary:disabled{background:#cbd3dc;color:#687789;box-shadow:none;opacity:1}
 .card-heading h2{letter-spacing:-.6px}
 @media(max-width:420px){.verification-row{grid-template-columns:minmax(0,1fr) 112px;gap:7px}.button-code{font-size:11px;padding:0 6px}}
+
+.card-brand{display:flex;align-items:center;gap:10px;margin:0 0 22px;color:#163554;font:800 17px Manrope,sans-serif;letter-spacing:-.5px}.card-brand img{width:38px;height:38px;object-fit:contain;border-radius:10px}.card-brand span span{color:#4d729d;font-weight:500}
