@@ -206,3 +206,24 @@ button:focus-visible, a:focus-visible { outline: 2px solid #67c9ff; outline-offs
   .auth-modal .auth-form { gap: 14px; }
   .auth-modal .auth-form input:not([type="checkbox"]) { height: 46px; }
 }
+
+/* 顶级域名实时搜索 */
+.domain-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:24px 0 18px;padding:5px;border:1px solid #dbeafe;border-radius:14px;background:#f0f7ff}
+.domain-tabs button{min-height:44px;border:0;border-radius:10px;background:transparent;color:#334155;font-weight:650;cursor:pointer}
+.domain-tabs button.active{background:#fff;color:#075be8;box-shadow:0 2px 8px rgba(15,45,90,.10)}
+.tld-panel{display:grid;gap:16px}
+.tld-intro{margin:0;color:#64748b;font-size:13px;line-height:1.7}
+.tld-search{display:flex;align-items:center;gap:10px}
+.tld-search input{flex:1;min-width:0}
+.tld-quote{display:grid;gap:14px;padding:20px;border:1px solid #dbeafe;border-radius:16px;background:#fff}
+.tld-quote>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tld-label{color:#64748b;font-size:13px}
+.tld-price{color:#075be8;font-size:22px}
+.tld-price small{font-size:12px;font-weight:500;color:#64748b}
+.tld-available{color:#059669}
+.tld-unavailable{color:#dc2626}
+.tld-quote p{margin:0;color:#64748b;font-size:12px;line-height:1.6}
+.tld-buy{width:100%}
+.button-oauth{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:46px;margin-top:12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;color:#0f172a;font-weight:650}
+.button-oauth:hover{border-color:#2563eb;background:#f8fbff}
+@media(max-width:420px){.domain-tabs{margin-top:18px}.tld-quote{padding:16px}.tld-price{font-size:19px}}
