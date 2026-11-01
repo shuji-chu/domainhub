@@ -4,7 +4,7 @@ import "./styles.css";
 
 const TEST_ENV = new URLSearchParams(window.location.search).get("env") === "test";
 const API = TEST_ENV ? "https://domainhub-api-test.chulingli1988.workers.dev" : "https://domainhub-api.chulingli1988.workers.dev";
-const TOKEN_KEY = TEST_ENV ? "domainhub_test_token" : TOKEN_KEY;
+const TOKEN_KEY = TEST_ENV ? "domainhub_test_token" : "domainhub_token";
 type Mode = "login" | "register" | "verify";
 type ApiResult = { ok?: boolean; message?: string; error?: string; testMode?: boolean; token?: string; user?: { id: string; email: string; displayName?: string | null; quota?: number } };
 
