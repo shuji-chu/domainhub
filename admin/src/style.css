@@ -40,3 +40,106 @@ th{background:rgba(5,14,29,.7);color:#8ea4c7;border-color:var(--line)}td{color:#
 .login-card .primary{background:linear-gradient(100deg,#397cff,#36b9e8);border:1px solid rgba(157,220,255,.45)}
 .toast{background:rgba(12,27,51,.96);border:1px solid rgba(115,174,255,.3);color:#eaf2ff;box-shadow:0 12px 40px rgba(0,0,0,.4)}
 @media(max-width:800px){.sidebar{background:rgba(7,15,30,.94)}}
+
+
+/* DNSHE-inspired shared light design system for the administration area */
+:root{
+ color-scheme:light;--ink:#183653;--muted:#687f96;--line:#e2eaf3;--blue:#246bd1;
+ background:#f5f8fc
+}
+html,body,#root{min-height:100%;background:#f5f8fc!important;color:#183653!important}
+body{background:linear-gradient(180deg,#f8fbff,#f2f7fc)!important}
+.shell{min-height:100vh;background:transparent}
+.sidebar{
+ width:236px;background:rgba(255,255,255,.96);border-right:1px solid #e2eaf3;
+ box-shadow:3px 0 16px rgba(27,62,102,.025);backdrop-filter:blur(18px)
+}
+.logo{color:#183653}
+.logo>b{background:linear-gradient(145deg,#2878df,#55b5ec);box-shadow:0 4px 13px rgba(36,107,209,.15);border-radius:9px}
+.logo>span>span{color:#246bd1}
+.logo small,.caption{color:#8295a8}
+.nav{color:#61788f;border-radius:9px;min-height:40px}
+.nav:hover,.nav.active{background:#edf5ff;color:#1e65bb}
+.nav.active{box-shadow:inset 3px 0 #246bd1}
+.nav i{color:#3d7fc3}
+.side-foot{background:#f7faff;border:1px solid #e3ebf4;border-radius:10px;color:#4f6b86}
+.side-foot small{color:#8194a7}
+.main{margin-left:236px}
+.main header{height:62px;background:rgba(255,255,255,.94);border-bottom:1px solid #e2eaf3;color:#71859a;backdrop-filter:blur(18px)}
+.main header b{color:#234361}
+.main header button{background:#fff;border:1px solid #dce6f0;color:#4b6782;border-radius:8px}
+.content{max-width:1240px;padding:28px clamp(18px,3vw,34px)}
+.heading small{color:#5780a8;letter-spacing:.12em}
+.heading h1{color:#193a59;font-size:25px}
+.heading p,.card>p,.toolbar p{color:#71859a}
+.metrics>div,.card{
+ background:#fff;border:1px solid #e2eaf3;border-radius:12px;
+ box-shadow:0 7px 22px rgba(31,66,104,.045);backdrop-filter:none
+}
+.metrics>div{color:#6c8298}
+.metrics b{color:#1c3c5b}
+.card h2{color:#1d3c5b}
+.toolbar input,.quota-row input,.login-card input{
+ color:#1d3b59;background:#fff;border:1px solid #d9e4ef;border-radius:8px
+}
+.toolbar input:focus,.quota-row input:focus,.login-card input:focus{
+ outline:3px solid rgba(36,107,209,.1);border-color:#82b0e2
+}
+th{background:#f5f8fc;color:#71859a;border-color:#e5ecf3}
+td{color:#5b7188;border-color:#edf1f6}
+td b{color:#1d3b59}
+.good{background:#eaf8f1;color:#16845b}
+.bad{background:#fff1f2;color:#bd4551}
+.action,.quota-row button,.main header button{
+ background:#fff;border:1px solid #dce6f0;color:#4d6882;border-radius:8px
+}
+.action:hover,.quota-row button:hover,.main header button:hover{
+ background:#f3f8ff;border-color:#aac9eb;color:#246bd1
+}
+.quota-row{border-color:#edf1f6}
+.quota-row span{color:#365571}
+.quota-row small{color:#8092a5}
+.quota-row strong{color:#1d3b59}
+.quota-row input{border-radius:7px}
+.quota-row button{padding:7px 10px}
+.primary{
+ color:#fff!important;background:linear-gradient(100deg,#246bd1,#3988df)!important;
+ border:1px solid #246bd1!important;border-radius:8px!important;
+ box-shadow:0 4px 12px rgba(36,107,209,.14)!important
+}
+.primary:hover:not(:disabled){background:linear-gradient(100deg,#1558bd,#2878d2)!important}
+.main footer{border-color:#e4ebf3;color:#8193a5}
+.backdrop{background:rgba(18,39,64,.42);backdrop-filter:blur(5px)}
+.dialog{background:#fff;border:1px solid #e1eaf3;border-radius:14px;box-shadow:0 22px 65px rgba(17,45,78,.18)}
+.toast{background:#1c4777;border:1px solid #346a9f;border-radius:9px;color:#fff;box-shadow:0 12px 30px rgba(25,59,96,.18)}
+.login-screen{background:radial-gradient(ellipse at 50% 0%,rgba(75,145,220,.1),transparent 58%)}
+.login-card{
+ background:#fff;border:1px solid #e1eaf3;border-radius:14px;
+ box-shadow:0 14px 40px rgba(28,66,108,.08);backdrop-filter:none
+}
+.login-card h1{color:#1b3b5a}
+.login-card p,.login-card label{color:#647b92}
+.login-card .primary{background:linear-gradient(100deg,#246bd1,#3988df);border:1px solid #246bd1}
+@media(max-width:800px){
+ .sidebar{width:100%;padding:12px 14px;background:rgba(255,255,255,.97);border-right:0;border-bottom:1px solid #e2eaf3}
+ .sidebar .logo{padding:0 4px 10px}
+ .sidebar .caption{display:none}
+ .sidebar .nav{display:inline-flex;width:auto;margin:0 5px 0 0;padding:8px 12px;min-height:36px}
+ .sidebar .side-foot{display:none}
+ .main{margin-left:0}
+ .main header{height:54px;padding:0 15px}
+ .content{padding:20px 14px}
+ .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:560px){
+ .sidebar{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+ .sidebar .logo{flex:1 0 100%;padding-bottom:7px}
+ .sidebar .nav{flex:1 1 auto;justify-content:center}
+ .heading{align-items:flex-start;gap:10px}
+ .heading h1{font-size:21px}
+ .toolbar{align-items:stretch}
+ .toolbar input{width:100%}
+ .quota-row{grid-template-columns:minmax(0,1fr) 34px 62px 46px 46px;gap:5px}
+ .quota-row button{padding:6px 2px}
+ .login-card{padding:24px 19px}
+}
