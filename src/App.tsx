@@ -5,7 +5,7 @@ import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import "./styles.css";
 
-const API = "https://domainhub-api.chulingli1988.workers.dev";
+const API = (import.meta.env.VITE_API_BASE_URL || "https://domainhub-api.chulingli1988.workers.dev").replace(/\/$/, "");
 const TOKEN_KEY = "domainhub_token";
 type Mode = "login" | "register" | "verify";
 type ApiResult = { ok?: boolean; message?: string; error?: string; token?: string; quota?: number; price_usdt?: number; order?: { order_no:string; domain:string; price_usdt:number; currency:string; status:string }; user?: { id: string; email: string; displayName?: string | null; quota?: number }; domains?: Array<{id:string;domain:string;status?:string}> };
