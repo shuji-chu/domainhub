@@ -36,7 +36,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [signedIn, setSignedIn] = useState<{ email: string; quota: number } | null>(null);
-  const [authOpen, setAuthOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(true);
   const [domains, setDomains] = useState<Array<{id:string;domain:string;status?:string}>>([]);
   const [myDomains, setMyDomains] = useState<Array<{id:string;domain:string;status?:string}>>([]);
   const [domainQuery, setDomainQuery] = useState("");
@@ -62,8 +62,13 @@ export default function App() {
           const result = await response.json().catch(() => ({})) as ApiResult;
           if (!response.ok || !result.user) throw new Error("会话已失效");
           setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
+          setAuthOpen(false);
         })
-        .catch(() => sessionStorage.removeItem(TOKEN_KEY));
+        .catch(() => {
+          sessionStorage.removeItem(TOKEN_KEY);
+          setAuthOpen(true);
+          setMode("login");
+        });
     }
     const params = new URLSearchParams(window.location.search);
     const oauthCode = params.get("oauth_code");
@@ -262,7 +267,7 @@ export default function App() {
     if (token) void fetch(API + "/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     sessionStorage.removeItem(TOKEN_KEY);
     setSignedIn(null);
-    setAuthOpen(false);
+    setAuthOpen(true);
     setEmail("");
     setPassword("");
     setMode("login");
@@ -357,12 +362,11 @@ export default function App() {
       </motion.section>
       <footer className="site-footer"><span>© {new Date().getFullYear()} DomainHub</span><span>安全 · 简洁 · 自主掌控</span></footer>
       {authOpen && !signedIn && (
-        <div className="auth-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setAuthOpen(false); }}>
+        <div className="auth-overlay" role="dialog" aria-modal="true" aria-labelledby="auth-title">
           <div className="flex min-h-screen w-full items-center justify-center px-4 py-6">
             <section className="auth-card auth-modal w-full max-w-md min-w-0" aria-labelledby="auth-title">
               <div className="auth-card-toolbar">
                 <span aria-hidden="true" />
-                <button className="auth-close" type="button" aria-label="关闭" onClick={() => setAuthOpen(false)}>×</button>
               </div>
               <div className="card-heading">
                 <div className="card-brand"><img src="/logo.svg" alt="DomainHub" /><span>Domain<span>Hub</span></span></div>
