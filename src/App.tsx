@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import "./styles.css";
 
 const API = "https://domainhub-api.chulingli1988.workers.dev";
@@ -28,6 +28,40 @@ export default function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [signedIn, setSignedIn] = useState<{ email: string; quota: number } | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthCode = params.get("oauth_code");
+    const authError = params.get("auth_error");
+    if (authError) {
+      const messages: Record<string, string> = {
+        github_unconfigured: "GitHub 授权登录暂不可用，请使用邮箱密码登录。",
+        oauth_consent_required: "请先阅读并同意用户服务协议和隐私政策。",
+        github_state: "授权状态已失效，请重新发起登录。",
+        github_failed: params.get("reason") || "GitHub 授权失败，请重试。",
+      };
+      setError(messages[authError] || "授权登录未完成，请重试。");
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+    if (oauthCode) {
+      setBusy(true);
+      request("/auth/github/exchange", { code: oauthCode })
+        .then(result => {
+          if (!result.token || !result.user) throw new Error("授权登录响应不完整，请重试");
+          sessionStorage.setItem("domainhub_token", result.token);
+          setSignedIn({ email: result.user.email, quota: Number(result.user.quota || 0) });
+          window.history.replaceState({}, "", window.location.pathname);
+        })
+        .catch(err => setError(err instanceof Error ? err.message : "GitHub 授权登录失败"))
+        .finally(() => setBusy(false));
+    }
+  }, []);
+
+  const startGithub = () => {
+    const query = mode === "register" ? "?mode=register&terms=1.0&privacy=1.0" : "";
+    window.location.assign(API + "/auth/github/start" + query);
+  };
 
   const switchMode = (next: Mode) => {
     setMode(next);
@@ -154,8 +188,10 @@ export default function App() {
               {mode === "login" && (
                 <form onSubmit={handleLogin} className="auth-form">
                   <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
-                  <label>登录密码<input type="password" autoComplete="current-password" required minLength={12} value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码（至少 12 位）" /></label>
+                  <label>登录密码<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码（至少 12 位）" /></label>
                   <button className="button button-primary" type="submit" disabled={busy}>{busy ? "正在登录…" : "登录账户"}<span>→</span></button>
+                  <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy}><span className="github-mark">●</span> 使用 GitHub 授权登录</button>
+                  <button type="button" className="text-button forgot-link" onClick={() => { setError(""); setNotice("密码找回功能即将接入。"); }}>忘记密码？</button>
                   <p className="form-foot">尚未拥有账户？ <button type="button" className="text-button" onClick={() => switchMode("register")}>立即注册</button></p>
                 </form>
               )}
@@ -170,6 +206,7 @@ export default function App() {
                     <label className="check-row"><input type="checkbox" checked={privacyAccepted} onChange={e => setPrivacyAccepted(e.target.checked)} /><span>我已阅读并同意 <a href="#privacy">隐私政策</a></span></label>
                   </div>
                   <button className="button button-primary" type="submit" disabled={busy || !termsAccepted || !privacyAccepted}>{busy ? "正在创建账户…" : "创建账户"}<span>→</span></button>
+                  <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy || !termsAccepted || !privacyAccepted}><span className="github-mark">●</span> 使用 GitHub 授权注册</button>
                   <p className="form-foot">已有账户？ <button type="button" className="text-button" onClick={() => switchMode("login")}>返回登录</button></p>
                 </form>
               )}
