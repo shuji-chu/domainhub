@@ -70,6 +70,8 @@ export default function App() {
   ];
   function navigate(next: string) {
     setPage(next); setDrawerOpen(false); setPageError(""); setError(""); setNotice("");
+    if (next === "domains") setActiveTab("subdomains");
+    if (next === "tld") setActiveTab("tld");
     if ((next === "dns" || next === "servers") && !signedIn) { switchMode("login"); return; }
     if (next === "dns" && signedIn) void loadDns();
     if (next === "servers" && signedIn) void loadServers();
