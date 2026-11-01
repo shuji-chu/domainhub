@@ -358,9 +358,18 @@ export default function App() {
                   </div>
                   {testVerificationCode && (
                     <div className="test-code-panel" role="status" aria-live="polite">
-                      <span>测试通道验证码 · 10 分钟有效</span>
+                      <span>你的邮箱验证码 · 10 分钟有效</span>
                       <strong>{testVerificationCode}</strong>
-                      <p>当前未配置邮件服务，验证码直接显示在这里；已自动填入上方输入框。</p>
+                      <button
+                        className="test-code-copy"
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(testVerificationCode)
+                            .then(() => setNotice("验证码已复制，也已自动填入输入框。"))
+                            .catch(() => setError("复制失败，请长按上方 6 位验证码复制。"));
+                        }}
+                      >一键复制验证码</button>
+                      <p>验证码已自动填入上方输入框，可直接点击“创建账户”。</p>
                     </div>
                   )}
                   <p className="hint">{testVerificationCode ? "测试验证码已在上方显示并自动填入，有效期 10 分钟；确认信息后可直接创建账户。" : codeSent ? "验证码已发送至邮箱，有效期 10 分钟；邮箱、密码和显示名称已锁定。" : "请先填写邮箱和密码，并勾选下方协议后获取验证码。"}</p>
