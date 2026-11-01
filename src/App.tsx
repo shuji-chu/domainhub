@@ -337,7 +337,7 @@ export default function App() {
           </>
         ) : (
           <div className="tld-panel">
-            <p className="tld-intro">输入完整域名查询报价，例如 myname.com。此处为静态模拟报价，暂未连接注册商库存与实时可注册性。</p>
+            <p className="tld-intro">输入完整域名查询 Spaceship 实时价格与可用状态，例如 myname.com。点击“立即下单”将直接向注册商提交注册请求。</p>
             <div className="domain-search tld-search">
               <span>⌕</span>
               <input value={tldInput} onChange={e => setTldInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter") void searchTld(); }} placeholder="myname.com" aria-label="输入顶级域名" />
