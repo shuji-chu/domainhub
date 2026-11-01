@@ -1,0 +1,2 @@
+src/App.tsx(47,10): error TS6133: 'AmbientCanvas' is declared but its value is never read.
+src/App.tsx(60,614): error TS6133: 'resetToken' is declared but its value is never read.
