@@ -232,7 +232,7 @@ export default function App() {
       }
       if (latest.status === "completed") setNotice("域名注册成功，订单号：" + latest.order_no);
       else if (latest.status === "failed") setError(latest.provider_error || "Spaceship 注册失败，请查看订单详情。");
-      else setNotice("注册请求已提交，订单号：" + latest.order_no + "；当前状态：" + (latest.status === "pending" ? "注册商处理中，页面会继续更新" : "等待注册商确认") + "。");
+      else setNotice("注册请求已提交，订单号：" + latest.order_no + "；当前状态：" + (latest.status === "pending" ? "注册商仍在处理中，请稍后重新查询订单状态" : "等待注册商确认") + "。");
     } catch (err) { setError(err instanceof Error ? err.message : "订单创建失败"); }
     finally { setTldOrderLoading(false); }
   }
