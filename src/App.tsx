@@ -248,14 +248,18 @@ export default function App() {
               {mode === "register" && (
                 <form onSubmit={handleRegister} className="auth-form">
                   <label>显示名称 <span className="optional">选填</span><input autoComplete="nickname" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="你希望如何称呼你" maxLength={60} disabled={codeSent} /></label>
-                  <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" /></label>
-                  <label>设置密码<input type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} placeholder="至少 12 位，最多 128 位" /></label>
-                  <div className="consents">
-                    <label className="check-row"><input type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} /><span>我已阅读并同意 <a href="#terms">用户服务协议</a></span></label>
-                    <label className="check-row"><input type="checkbox" checked={privacyAccepted} onChange={e => setPrivacyAccepted(e.target.checked)} /><span>我已阅读并同意 <a href="#privacy">隐私政策</a></span></label>
+                  <label>邮箱地址<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" disabled={codeSent} /></label>
+                  <label>设置密码<input type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} placeholder="至少 12 位，最多 128 位" disabled={codeSent} /></label>
+                  <div className="verification-row">
+                    <label>邮箱验证码<input className="code-input" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="输入 6 位验证码" /></label>
+                    <button className="button button-code" type="button" onClick={() => void handleGetCode()} disabled={busy || countdown > 0 || !email || !password || !termsAccepted || !privacyAccepted}>{busy ? "发送中…" : countdown > 0 ? `${countdown} 秒后重发` : codeSent ? "重新获取" : "获取验证码"}</button>
                   </div>
-                  <button className="button button-primary" type="submit" disabled={busy || !termsAccepted || !privacyAccepted}>{busy ? "正在创建账户…" : "创建账户"}<span>→</span></button>
-                  <button className="button button-oauth" type="button" onClick={startGithub} disabled={busy || !termsAccepted || !privacyAccepted}><Github size={18} strokeWidth={2.2} aria-hidden="true" /> 使用 GitHub 授权注册</button>
+                  <p className="hint">{codeSent ? "验证码已发送至邮箱，有效期 10 分钟；邮箱、密码和显示名称已锁定。" : "请先填写邮箱和密码，并勾选下方协议后获取验证码。"}</p>
+                  <div className="consents">
+                    <label className="check-row"><input type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} disabled={codeSent} /><span>我已阅读并同意 <a href="#terms">用户服务协议</a></span></label>
+                    <label className="check-row"><input type="checkbox" checked={privacyAccepted} onChange={e => setPrivacyAccepted(e.target.checked)} disabled={codeSent} /><span>我已阅读并同意 <a href="#privacy">隐私政策</a></span></label>
+                  </div>
+                  <button className="button button-primary" type="submit" disabled={busy || !termsAccepted || !privacyAccepted || !codeSent || code.length !== 6}>{busy ? "正在验证并创建…" : "创建账户"}<span>→</span></button>
                   <p className="form-foot">已有账户？ <button type="button" className="text-button" onClick={() => switchMode("login")}>返回登录</button></p>
                 </form>
               )}
